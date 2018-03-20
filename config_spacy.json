@@ -1,0 +1,14 @@
+{
+  "pipeline": [
+    "nlp_spacy",
+    "tokenizer_spacy",
+    "intent_entity_featurizer_regex",
+    "intent_featurizer_spacy",
+    "ner_crf",
+    "ner_synonyms",
+    "intent_classifier_sklearn"
+  ],
+  "max_numbers_of_ngrams": 6,
+  "path" : "./models/nlu",
+  "data" : "./nlu.json"
+}
