@@ -1,0 +1,5 @@
+# Ignore cached python objects
+*.pyc
+# Ignore logs and compiled models
+/logs/*
+/models/*
