@@ -68,7 +68,7 @@ class digitalAssistant():
         self.logger.debug("Weather.gov returned "+str(weather))
         temperature = weather['properties']['temperature']['value']
         conditions = weather['properties']['textDescription']
-        if temperature == "None":
+        if not isinstance(temperature,float):
             self.logger.warning("Temperature unavailable from weather.gov...")
             print ("It is currently {0}, but I cannot get the temperature for some reason.".format(conditions))
         else:
