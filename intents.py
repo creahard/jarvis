@@ -9,8 +9,7 @@ class digitalAssistant():
                   'master', 'front porch', 'back porch', 'foyer', 'mudroom',
                   'guest', 'utility', 'bathroom', 'hall', 'hallway', 'counter']
 
-    def __init__(self,room,name='Jarvis',logLevel='WARN'):
-        self.room = room
+    def __init__(self,name='Jarvis',logLevel='WARN'):
         self.name = name
         self.logger = logging.getLogger(self.name)
         coloredlogs.install(level=logLevel,logger=self.logger)
@@ -74,8 +73,19 @@ class digitalAssistant():
         else:
             print ("It is currently {0} and {1:.0f} degrees.".format(conditions,temperature*9/5+32))
 
-    
-    def controlDevice(self, res):
+ 
+    def controlDevice(self, device, command, room):
+        if any(device in d for d in self.validDevices):
+            method = 'insteon'
+        elif any(device in ir for ir in self.irDevices):
+            method = 'infrared'
+        else:
+            self.logger.warn("Device "+device+" is unknown!")
+            print ("I do not know how to control a "+entity['value'])
+            return -1
+        print ("Using "+method+" to turn "+command+" the "+device+" in the "+room)
+                
+    def originalControlDevice(self, res):
         if len(res['entities']):
             for entity in res['entities']:
                 if entity['entity'] == 'room':
