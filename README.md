@@ -3,9 +3,12 @@
 This is my attempt at making my own Digital Assistant with two main requirements:
 
 1. No cloud interface required
-  * I want him to be able to function w/out being connected to the Internet
+
+I want him to be able to function w/out being connected to the Internet
+
 2. Context aware
-  * When I get to speech recognition I will have microphones in most rooms and saying "Jarvis turn off the lights" should be understood as affecting the room of the source.
+
+When I get to speech recognition I will have microphones in most rooms and saying "Jarvis turn off the lights" should be understood as affecting the room of the source.
 
 ## What I've found so far
 
