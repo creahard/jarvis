@@ -3,7 +3,8 @@ from datetime import datetime
 import re,requests
 
 class digitalAssistant():
-    validDevices = ['light', 'lights', 'tv', 'fan', 'cable box', 'bluray player','radio']
+    validDevices = ['light', 'lights', 'fan']
+    irDevices = ['tv', 'cable box', 'bluray player','radio']
     validRooms = ['office', 'study', 'living room', 'dining room', 'family room', 'kitchen',
                   'master', 'front porch', 'back porch', 'foyer', 'mudroom',
                   'guest', 'utility', 'bathroom', 'hall', 'hallway', 'counter']
@@ -73,27 +74,8 @@ class digitalAssistant():
         else:
             print ("It is currently {0} and {1:.0f} degrees.".format(conditions,temperature*9/5+32))
 
-    def insteon(self,res):
-        for entity in res['entities']:
-            if entity['entity'] == 'set':
-                function = entity['value']
-        if not 'function' in locals():
-            self.logger.warning("No function could be identified in "+res['text'])
-            print ("I'm affraid I don't know how to perform this request.")
-            return -1
-        self.device('insteon',function,res)
-
-    def infrared(self,res):
-        for entity in res['entities']:
-            if entity['entity'] == 'set':
-                function = entity['value']
-        if not 'function' in locals():
-            self.logger.warning("No function could be identified in "+res['text'])
-            print ("I'm affraid I don't know how to perform this request.")
-            return -1
-        self.device('infrared',function,res)
     
-    def device(self, mode, function, res):
+    def controlDevice(self, res):
         if len(res['entities']):
             for entity in res['entities']:
                 if entity['entity'] == 'room':
@@ -103,13 +85,23 @@ class digitalAssistant():
                         self.logger.warn(entity['value']+" tagged as room but room is already determined in \""+res['text']+"\"")
                     else:
                         room = entity['value']
+                elif entity['entity'] == 'command':
+                    if 'command' in locals():
+                        self.logger.warn("Command "+entity['value']+" found but command "+device+" already found!")
+                    command = entity['value']
                 elif entity['entity'] == 'device':
-                    if not any(entity['value'] in r for r in self.validDevices):
+                    if 'device' in locals():
+                        self.logger.warn("Device "+entity['value']+" found but device "+device['name']+" already found!")
+                    elif any(entity['value'] in d for d in self.validDevices) or any(entity['value'] in ir for ir in self.irDevices):
+                        if any(entity['value'] in d for d in self.validDevices):
+                            device = {'name': entity['value'], 'control': 'insteon'}
+                        else:
+                            device = {'name': entity['value'], 'control': 'infrared'}
                         self.logger.warn(entity['value']+" was identified as a device in \""+res['text']+"\"")
-                    elif 'room' in locals():
-                        self.logger.warn(entity['value']+" tagged as device but device is already determined in \""+res['text']+"\"")
                     else:
-                        device = entity['value']
+                        self.logger.warn("Device "+entity['value']+" is unknown!")
+                        print ("I do not know how to control a "+entity['value'])
+                        return -1
         if 'room' not in locals():
             self.logger.info("Room determined by message source.")
             room = self.room
@@ -117,5 +109,5 @@ class digitalAssistant():
             self.logger.critical("No device identified in \""+res['text']+"\"")
             print ("I'm sorry, I don't believe I can control that device.")
             return -1
-        print ("Using "+mode+" to turn "+function+" the "+device+" in the "+room)
+        print ("Using "+device['control']+" to turn "+command+" the "+device['name']+" in the "+room)
                 

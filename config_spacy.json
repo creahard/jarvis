@@ -8,7 +8,7 @@
     "ner_synonyms",
     "intent_classifier_sklearn"
   ],
-  "max_numbers_of_ngrams": 6,
+  "max_training_processes": 2,
   "path" : "./models/nlu",
   "data" : "./nlu.json"
 }
