@@ -4,6 +4,6 @@
 /logs/*
 /models/*
 # Ignore all json files except nlu and config
-!*.json
-config_spacy.json
-nlu.json
+*.json
+!config_spacy.json
+!nlu.json
