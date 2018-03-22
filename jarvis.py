@@ -43,7 +43,8 @@ class JarvisInterface:
             if req == "/quit":
                 exit(0)
             elif req == "/console":
-                code.interact(local=locals())
+                code.interact(banner="Enter Ctrl-D to return control to the program",local=locals())
+                continue
             self.get_intent(req)
 
     def get_intent(self,req):
