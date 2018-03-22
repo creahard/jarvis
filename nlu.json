@@ -1,225 +1,214 @@
-{ 
- "rasa_nlu_data":
- {
-  "entity_synonyms":
-  [
-   {
-    "value": "tv",
-    "synonyms": ["television", "television set", "telly", "boob tube", "tube", "baby sitter", "tv set", "idiot box"]
-   }
-  ],
-  "regex_features":
-  [
-   {
-    "name": "light",
-    "pattern": "light[s]?"
-   },
-   {
-    "name": "rooms",
-    "pattern": "(dining|family|living)( room)?"
-   }
-  ],
-  "common_examples":
-  [
-   {
-    "text": "hello",
-    "intent": "greet",
-    "entities": []
-   },
-   {
-    "text": "hi",
-    "intent": "greet",
-    "entities": []
-   },
-   {
-    "text": "hey",
-    "intent": "greet",
-    "entities": []
-   },
-   {
-    "text": "good morning",
-    "intent": "greet",
-    "entities": 
-     [{
-      "start": 5,
-      "end": 12,
-      "value": "morning",
-      "entity": "timeframe"
-     }]
-   },
-   {
-    "text": "good afternoon",
-    "intent": "greet",
-    "entities": 
-     [{
-      "start": 5,
-      "end": 14,
-      "value": "afternoon",
-      "entity": "timeframe"
-     }]
-   },
-   {
-    "text": "good evening",
-    "intent": "greet",
-    "entities": 
-     [{
-      "start": 5,
-      "end": 12,
-      "value": "evening",
-      "entity": "timeframe"
-     }]
-   },
-   {
-    "text": "goodbye",
-    "intent": "goodbye",
-    "entities": []
-   },
-   {
-    "text": "bye",
-    "intent": "goodbye",
-    "entities": []
-   },
-   {
-    "text": "later",
-    "intent": "goodbye",
-    "entities": []
-   },
-   {
-    "text": "thank you",
-    "intent": "goodbye",
-    "entities": []
-   },
-   {
-    "text": "yes",
-    "intent": "affirm",
-    "entities": []
-   },
-   {
-    "text": "please",
-    "intent": "affirm",
-    "entities": []
-   },
-   {
-    "text": "yes please",
-    "intent": "affirm",
-    "entities": []
-   },
-   {
-    "text": "yeah",
-    "intent": "affirm",
-    "entities": []
-   },
-   {
-    "text": "correct",
-    "intent": "affirm",
-    "entities": []
-   },
-   {
-    "text": "affirmative",
-    "intent": "affirm",
-    "entities": []
-   },
-   {
-    "text": "please do",
-    "intent": "affirm",
-    "entities": []
-   },
-   {
-    "text": "no",
-    "intent": "deny",
-    "entities": []
-   },
-   {
-    "text": "incorrect",
-    "intent": "deny",
-    "entities": []
-   },
-   {
-    "text": "that's not correct",
-    "intent": "deny",
-    "entities": []
-   },
-   {
-    "text": "that is incorrect",
-    "intent": "deny",
-    "entities": []
-   },
-   {
-    "text": "negative",
-    "intent": "deny",
-    "entities": []
-   },
-   {
-    "text": "how is it outside",
-    "intent": "weather",
-    "entities": 
-     [{
-      "start": 10,
-      "end": 17,
-      "value": "outside",
-      "entity": "location"
-     }]
-   },
-   {
-    "text": "what is the weather like here",
-    "intent": "weather",
-    "entities": 
-     [{
-      "start": 25,
-      "end": 29,
-      "value": "here",
-      "entity": "location"
-     }]
-   },
-   {
-    "text": "what does it look like today",
-    "intent": "weather",
-    "entities": 
-     [{
-      "start": 23,
-      "end": 28,
-      "value": "today",
-      "entity": "timeframe"
-     }]
-   },
-   {
-    "text": "will I need an umbrella",
-    "intent": "weather",
-    "entities": []
-   },
-   {
-    "text": "what time is it",
-    "intent": "time",
-    "entities": 
-     [{
-      "start": 5,
-      "end": 9,
-      "value": "time",
-      "entity": "clock"
-     }]
-   },
-   {
-    "text": "do you have the time",
-    "intent": "time",
-    "entities": 
-     [{
-      "start": 16,
-      "end": 20,
-      "value": "time",
-      "entity": "clock"
-     }]
-   },
-   {
-    "text": "what does the clock say now",
-    "intent": "time",
-    "entities": 
-     [{
-      "start": 24,
-      "end": 27,
-      "value": "now",
-      "entity": "timeframe"
-     }]
-   },
+{
+    "rasa_nlu_data": {
+        "common_examples": [
+            {
+                "entities": [],
+                "intent": "greet",
+                "text": "hello"
+            },
+            {
+                "entities": [],
+                "intent": "greet",
+                "text": "hi"
+            },
+            {
+                "entities": [],
+                "intent": "greet",
+                "text": "hey"
+            },
+            {
+                "entities": [
+                    {
+                        "end": 12,
+                        "entity": "timeframe",
+                        "start": 5,
+                        "value": "morning"
+                    }
+                ],
+                "intent": "greet",
+                "text": "good morning"
+            },
+            {
+                "entities": [
+                    {
+                        "end": 14,
+                        "entity": "timeframe",
+                        "start": 5,
+                        "value": "afternoon"
+                    }
+                ],
+                "intent": "greet",
+                "text": "good afternoon"
+            },
+            {
+                "entities": [
+                    {
+                        "end": 12,
+                        "entity": "timeframe",
+                        "start": 5,
+                        "value": "evening"
+                    }
+                ],
+                "intent": "greet",
+                "text": "good evening"
+            },
+            {
+                "entities": [],
+                "intent": "goodbye",
+                "text": "goodbye"
+            },
+            {
+                "entities": [],
+                "intent": "goodbye",
+                "text": "bye"
+            },
+            {
+                "entities": [],
+                "intent": "goodbye",
+                "text": "later"
+            },
+            {
+                "entities": [],
+                "intent": "goodbye",
+                "text": "thank you"
+            },
+            {
+                "entities": [],
+                "intent": "affirm",
+                "text": "yes"
+            },
+            {
+                "entities": [],
+                "intent": "affirm",
+                "text": "please"
+            },
+            {
+                "entities": [],
+                "intent": "affirm",
+                "text": "yes please"
+            },
+            {
+                "entities": [],
+                "intent": "affirm",
+                "text": "yeah"
+            },
+            {
+                "entities": [],
+                "intent": "affirm",
+                "text": "correct"
+            },
+            {
+                "entities": [],
+                "intent": "affirm",
+                "text": "affirmative"
+            },
+            {
+                "entities": [],
+                "intent": "affirm",
+                "text": "please do"
+            },
+            {
+                "entities": [],
+                "intent": "deny",
+                "text": "no"
+            },
+            {
+                "entities": [],
+                "intent": "deny",
+                "text": "incorrect"
+            },
+            {
+                "entities": [],
+                "intent": "deny",
+                "text": "that's not correct"
+            },
+            {
+                "entities": [],
+                "intent": "deny",
+                "text": "that is incorrect"
+            },
+            {
+                "entities": [],
+                "intent": "deny",
+                "text": "negative"
+            },
+            {
+                "entities": [
+                    {
+                        "end": 17,
+                        "entity": "location",
+                        "start": 10,
+                        "value": "outside"
+                    }
+                ],
+                "intent": "weather",
+                "text": "how is it outside"
+            },
+            {
+                "entities": [
+                    {
+                        "end": 29,
+                        "entity": "location",
+                        "start": 25,
+                        "value": "here"
+                    }
+                ],
+                "intent": "weather",
+                "text": "what is the weather like here"
+            },
+            {
+                "entities": [
+                    {
+                        "end": 28,
+                        "entity": "timeframe",
+                        "start": 23,
+                        "value": "today"
+                    }
+                ],
+                "intent": "weather",
+                "text": "what does it look like today"
+            },
+            {
+                "entities": [],
+                "intent": "weather",
+                "text": "will I need an umbrella"
+            },
+            {
+                "entities": [
+                    {
+                        "end": 9,
+                        "entity": "clock",
+                        "start": 5,
+                        "value": "time"
+                    }
+                ],
+                "intent": "time",
+                "text": "what time is it"
+            },
+            {
+                "entities": [
+                    {
+                        "end": 20,
+                        "entity": "clock",
+                        "start": 16,
+                        "value": "time"
+                    }
+                ],
+                "intent": "time",
+                "text": "do you have the time"
+            },
+            {
+                "entities": [
+                    {
+                        "end": 27,
+                        "entity": "timeframe",
+                        "start": 24,
+                        "value": "now"
+                    }
+                ],
+                "intent": "time",
+                "text": "what does the clock say now"
+            },
             {
                 "entities": [
                     {
@@ -99867,6 +99856,31 @@
                 ],
                 "intent": "queryDevice",
                 "text": "how did the bluray player in the library get turned on"
+            }
+        ],
+        "entity_synonyms": [
+            {
+                "synonyms": [
+                    "television",
+                    "television set",
+                    "telly",
+                    "boob tube",
+                    "tube",
+                    "baby sitter",
+                    "tv set",
+                    "idiot box"
+                ],
+                "value": "tv"
+            }
+        ],
+        "regex_features": [
+            {
+                "name": "light",
+                "pattern": "light[s]?"
+            },
+            {
+                "name": "rooms",
+                "pattern": "(dining|family|living)( room)?"
             }
         ]
     }

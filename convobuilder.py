@@ -1,7 +1,247 @@
 #!/bin/python
 ### Build a conversaional training file for Rasa NLU from a set of lists
 
-import json,re
+import json, re
+
+training_data = {
+    "rasa_nlu_data": {
+        "common_examples": [
+            {
+                "entities": [],
+                "intent": "greet",
+                "text": "hello"
+            },
+            {
+                "entities": [],
+                "intent": "greet",
+                "text": "hi"
+            },
+            {
+                "entities": [],
+                "intent": "greet",
+                "text": "hey"
+            },
+            {
+                "entities": [
+                    {
+                        "end": 12,
+                        "entity": "timeframe",
+                        "start": 5,
+                        "value": "morning"
+                    }
+                ],
+                "intent": "greet",
+                "text": "good morning"
+            },
+            {
+                "entities": [
+                    {
+                        "end": 14,
+                        "entity": "timeframe",
+                        "start": 5,
+                        "value": "afternoon"
+                    }
+                ],
+                "intent": "greet",
+                "text": "good afternoon"
+            },
+            {
+                "entities": [
+                    {
+                        "end": 12,
+                        "entity": "timeframe",
+                        "start": 5,
+                        "value": "evening"
+                    }
+                ],
+                "intent": "greet",
+                "text": "good evening"
+            },
+            {
+                "entities": [],
+                "intent": "goodbye",
+                "text": "goodbye"
+            },
+            {
+                "entities": [],
+                "intent": "goodbye",
+                "text": "bye"
+            },
+            {
+                "entities": [],
+                "intent": "goodbye",
+                "text": "later"
+            },
+            {
+                "entities": [],
+                "intent": "goodbye",
+                "text": "thank you"
+            },
+            {
+                "entities": [],
+                "intent": "affirm",
+                "text": "yes"
+            },
+            {
+                "entities": [],
+                "intent": "affirm",
+                "text": "please"
+            },
+            {
+                "entities": [],
+                "intent": "affirm",
+                "text": "yes please"
+            },
+            {
+                "entities": [],
+                "intent": "affirm",
+                "text": "yeah"
+            },
+            {
+                "entities": [],
+                "intent": "affirm",
+                "text": "correct"
+            },
+            {
+                "entities": [],
+                "intent": "affirm",
+                "text": "affirmative"
+            },
+            {
+                "entities": [],
+                "intent": "affirm",
+                "text": "please do"
+            },
+            {
+                "entities": [],
+                "intent": "deny",
+                "text": "no"
+            },
+            {
+                "entities": [],
+                "intent": "deny",
+                "text": "incorrect"
+            },
+            {
+                "entities": [],
+                "intent": "deny",
+                "text": "that's not correct"
+            },
+            {
+                "entities": [],
+                "intent": "deny",
+                "text": "that is incorrect"
+            },
+            {
+                "entities": [],
+                "intent": "deny",
+                "text": "negative"
+            },
+            {
+                "entities": [
+                    {
+                        "end": 17,
+                        "entity": "location",
+                        "start": 10,
+                        "value": "outside"
+                    }
+                ],
+                "intent": "weather",
+                "text": "how is it outside"
+            },
+            {
+                "entities": [
+                    {
+                        "end": 29,
+                        "entity": "location",
+                        "start": 25,
+                        "value": "here"
+                    }
+                ],
+                "intent": "weather",
+                "text": "what is the weather like here"
+            },
+            {
+                "entities": [
+                    {
+                        "end": 28,
+                        "entity": "timeframe",
+                        "start": 23,
+                        "value": "today"
+                    }
+                ],
+                "intent": "weather",
+                "text": "what does it look like today"
+            },
+            {
+                "entities": [],
+                "intent": "weather",
+                "text": "will I need an umbrella"
+            },
+            {
+                "entities": [
+                    {
+                        "end": 9,
+                        "entity": "clock",
+                        "start": 5,
+                        "value": "time"
+                    }
+                ],
+                "intent": "time",
+                "text": "what time is it"
+            },
+            {
+                "entities": [
+                    {
+                        "end": 20,
+                        "entity": "clock",
+                        "start": 16,
+                        "value": "time"
+                    }
+                ],
+                "intent": "time",
+                "text": "do you have the time"
+            },
+            {
+                "entities": [
+                    {
+                        "end": 27,
+                        "entity": "timeframe",
+                        "start": 24,
+                        "value": "now"
+                    }
+                ],
+                "intent": "time",
+                "text": "what does the clock say now"
+            }
+        ],
+        "entity_synonyms": [
+            {
+                "synonyms": [
+                    "television",
+                    "television set",
+                    "telly",
+                    "boob tube",
+                    "tube",
+                    "baby sitter",
+                    "tv set",
+                    "idiot box"
+                ],
+                "value": "tv"
+            }
+        ],
+        "regex_features": [
+            {
+                "name": "light",
+                "pattern": "light[s]?"
+            },
+            {
+                "name": "rooms",
+                "pattern": "(dining|family|living)( room)?"
+            }
+        ]
+    }
+}
 
 # Items are {0} in formatted strings
 items = ["light", "lights", "fan", "tv", "radio", "cable box", "dvd player", "bluray player"]
@@ -99,7 +339,7 @@ for line in lines:
        for r in rooms:
            entity = buildEntity(line=line,item=i,room=r)
            entity['intent'] = 'controlDevice'
-           data['common_examples'].append(entity)
+           training_data['rasa_nlu_data']['common_examples'].append(entity)
            if not hasRoom.search(line):
                break
 
@@ -123,11 +363,10 @@ for line in queries:
            entity['entities'].append({
                    'start': 0, 'end': end,
                    'value': query, 'entity': 'cognitive'})
-           data['common_examples'].append(entity)
+           training_data['rasa_nlu_data']['common_examples'].append(entity)
            if not hasRoom.search(line):
                break
 
-print (json.dumps({'rasa_nlu_data': data}))
+print (json.dumps(training_data))
 
-#print (data)
        
