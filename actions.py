@@ -2,14 +2,14 @@ import coloredlogs, logging
 from datetime import datetime
 import re,requests
 
-class digitalAssistant():
+class ActionManager():
     validDevices = ['light', 'lights', 'fan']
     irDevices = ['tv', 'cable box', 'bluray player','radio']
     validRooms = ['office', 'study', 'living room', 'dining room', 'family room', 'kitchen',
                   'master', 'front porch', 'back porch', 'foyer', 'mudroom',
                   'guest', 'utility', 'bathroom', 'hall', 'hallway', 'counter']
 
-    def __init__(self,name='Jarvis',logLevel='WARN'):
+    def __init__(self,name='Actions',logLevel='WARN'):
         self.name = name
         self.logger = logging.getLogger(self.name)
         coloredlogs.install(level=logLevel,logger=self.logger)

@@ -15,7 +15,7 @@ from rasa_nlu.model import Trainer
 from rasa_nlu.model import Metadata, Interpreter
  
 import code
-from intents import digitalAssistant
+from actions import ActionManager
 
 
 class JarvisInterface:
@@ -23,7 +23,7 @@ class JarvisInterface:
     def __init__(self,room,name='Jarvis',nluinternal = True,loglevel='WARN'):
         self.room = room
         self.nluinternal = nluinternal
-        self.logger = logging.getLogger('Jarvis_Interface')
+        self.logger = logging.getLogger(name)
         coloredlogs.install(level=loglevel,logger=self.logger)
 
 
@@ -34,10 +34,10 @@ class JarvisInterface:
         model_directory = trainer.persist('models/nlu/', fixed_model_name="current")
 
 
-    def run(self,intentLoglevel='ERROR'):
+    def run(self,actionLoglevel='ERROR'):
         if self.nluinternal:
             self.nlu = Interpreter.load("models/nlu/default/current", RasaNLUConfig("config_spacy.json"))
-        self.jarvis = digitalAssistant('Jarvis',intentLoglevel)
+        self.action_mgr = ActionManager('Actions',actionLoglevel)
         while True:
             req = raw_input(">> ")
             if req == "/quit":
@@ -76,7 +76,7 @@ class JarvisInterface:
             self.handle_device(entities,res['text'])
         else:
             try:
-                getattr(self.jarvis, intent)(res)
+                getattr(self.action_mgr, intent)(res)
             except AttributeError as e:
                 self.logger.critical("Intention "+intent+" is defined in NLU but not in the DigitalAssistant module!")
                 print ("I'm sorry, but I cannot support this request at this time.")        
@@ -94,12 +94,12 @@ class JarvisInterface:
             for r in entities['room']:
                 self.logger.info("MR:Attempting to send {0} to the {1} in the {2}".format(entities['command'][0],
                                                                                           entities['device'][0],r))
-                self.jarvis.controlDevice(entities['device'][0],entities['command'][0],r)
+                self.action_mgr.controlDevice(entities['device'][0],entities['command'][0],r)
         elif len(entities['room']) == 1 and len(entities['command']) == 1:
             for d in entities['device']:
                 self.logger.info("MD:Attempting to send {0} to the {1} in the {2}".format(entities['command'][0],
                                                                                           d,entities['room'][0]))
-                self.jarvis.controlDevice(d,entities['command'][0],entities['room'][0])
+                self.action_mgr.controlDevice(d,entities['command'][0],entities['room'][0])
         elif len(entities['command']) > 1 and len(entities['device']) == 1:
             self.logger.info("1-Received multiple commands, and rooms for one device. Attempting to split request.")
             for index,attempt in enumerate(request_text.split(' and ',1)):
@@ -134,11 +134,17 @@ if __name__ == '__main__':
             default="WARN",
             help="Set the logging level for Jarvis")
 
+    parser.add_argument('--actionloglevel', dest='actionloglevel',
+            choices=["DEBUG","INFO","WARN","ERROR","CRITICAL","NONE"],
+            default="WARN",
+            help="Set the logging level for the Action Manager")
+
     parser.add_argument('--nluinternal', dest='nluinternal',
             choices=["True","False"], default="True",
             help="Use internal or external NLU")
 
     loglevel = parser.parse_args().loglevel
+    actionloglevel = parser.parse_args().actionloglevel
     logger = logging.getLogger('Jarvis_Interface')
     coloredlogs.install(level=loglevel,logger=logger)
 
@@ -154,7 +160,7 @@ if __name__ == '__main__':
         jarvis.train_nlu()
     elif task == "run":
         logger.info("Loading saved models for execution...")
-        jarvis.run()
+        jarvis.run(actionLoglevel=actionloglevel)
     elif task == "both":
         logger.info("Beginning training process...")
         jarvis.train_nlu()
