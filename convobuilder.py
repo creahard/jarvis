@@ -1,7 +1,7 @@
 #!/bin/python
 ### Build a conversaional training file for Rasa NLU from a set of lists
 
-import json
+import json,re
 
 training_data = {
     "rasa_nlu_data": {
@@ -253,12 +253,14 @@ lines = [
 "turn on the {0} in the {1} please",
 "please turn on the {0}",
 "turn on the {0} please",
+"turn on the {0}",
 "can you turn on the {0} please",
 "can you please turn on the {0} in the {1}",
 "please turn off the {0} in the {1}",
 "turn off the {0} in the {1} please",
 "please turn off the {0}",
 "turn off the {0} please",
+"turn off the {0}",
 "can you turn off the {0} please",
 "can you please turn off the {0} in the {1}",
 "flip on the {0} in the {1}",
@@ -273,7 +275,10 @@ lines = [
 "cut off the {0} in the {1}",
 "please cut off the {0}",
 "cut off the {0} in the {1} please",
-]
+"kill the {0}",
+"kill the {0} in the {1}",
+"kill the {0} please",
+"please kill the {0} in the {1}"]
 
 queries = [
 "who turned on the {0}",
@@ -300,14 +305,16 @@ schedules = [
 "{2} turn on the {0} in the {1}",
 "{2} turn on the {0} please",
 "please turn on the {0} {2}",
-"please turn on the {0} in the {1} {2}"
+"please turn on the {0} in the {1} {2}",
 "turn on the {0} {2} please",
 "{2} turn off the {0}",
 "{2} turn off the {0} in the {1}",
 "{2} turn off the {0} please",
 "please turn off the {0} {2}",
 "please turn off the {0} in the {1} {2}",
-"turn off the {0} {2} please"]
+"turn off the {0} {2} please",
+"please kill the {0} {2}",
+"{2} kill the {0} in the {1}"]
 
 # Start and End - Just return the start and end of item in string
 def sne(string,item):
@@ -316,6 +323,9 @@ def sne(string,item):
     return [start,end]
 
 def buildEntity(line,room="",item="",time=""):
+    hasOn = re.compile(r'\b(on)\b')
+    hasOff = re.compile(r'\b(off)\b')
+    hasKill = re.compile(r'\b(kill)\b')
     entity = {}
     entity['entities'] = []
     clock = ""
@@ -324,8 +334,6 @@ def buildEntity(line,room="",item="",time=""):
             clock = "in "+time
         else:
             clock = "at "+time
-        # import code
-        # code.interact(local=locals())
     entity['text'] = line.format(item,room,clock)
     if line.find('{1}') > -1:
         [start, end] = sne(entity['text'],room)
@@ -337,15 +345,23 @@ def buildEntity(line,room="",item="",time=""):
         entity['entities'].append({
                 'start': start, 'end': end,
                 'value': item, 'entity': 'device'})
-        if entity['text'].find(' on') > -1:
-            [start, end] = sne(entity['text'],' on')
+        _on   = hasOn.search(entity['text'])
+        _off  = hasOff.search(entity['text'])
+        _kill = hasKill.search(entity['text'])
+        if _on:
+            [start, end] = _on.span()
             entity['entities'].append({
-                    'start': start+1, 'end': end,
+                    'start': start, 'end': end,
                     'value': 'on', 'entity': 'command'})
-        elif entity['text'].find(' off') > -1:
-            [start, end] = sne(entity['text'],' off')
+        elif _off:
+            [start, end] = _off.span()
             entity['entities'].append({
-                    'start': start+1, 'end': end,
+                    'start': start, 'end': end,
+                    'value': 'off', 'entity': 'command'})
+        elif _kill:
+            [start, end] = _kill.span()
+            entity['entities'].append({
+                    'start': start, 'end': end,
                     'value': 'off', 'entity': 'command'})
     if line.find('{2}'):
         [start, end] = sne(entity['text'],time)
@@ -388,16 +404,16 @@ for line in queries:
            if line.find('{1}') == -1:
                break
 
-times = ["five minutes", "ten pm", "one hour", "four hours", "eight am", "sixteen thirty", "noon", "midnight"]
-for t in times:
-    for l in schedules:
-       for i in items:
-           for r in rooms:
+times = ["five minutes", "ten pm", "one hour", "four hours", "eight am", "sixteen thirty", "noon", "midnight", "a half hour", "half an hour"]
+for l in schedules:
+   for i in items:
+       for r in rooms:
+           for t in times:
                entity = buildEntity(line=l,item=i,room=r,time=t)
                entity['intent'] = 'controlDevice'
                training_data['rasa_nlu_data']['common_examples'].append(entity)
-               if line.find('{1}') == -1:
-                   break
+           if l.find('{1}') == -1:
+               break
 
 print (json.dumps(training_data))
 

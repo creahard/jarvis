@@ -91,7 +91,7 @@ class JarvisInterface:
             return -1
 
         if entities.has_key('time'):
-            self.logger.critical("Control request for future action! "+entities['time'])
+            self.logger.critical("Control request for future action! "+str(entities['time']))
 
         if len(entities['command']) == 1 and len(entities['device']) == 1:
             for r in entities['room']:
