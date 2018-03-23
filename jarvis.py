@@ -90,6 +90,9 @@ class JarvisInterface:
             self.logger.error("Cannot identity device to command.")
             return -1
 
+        if entities.has_key('time'):
+            self.logger.critical("Control request for future action! "+entities['time'])
+
         if len(entities['command']) == 1 and len(entities['device']) == 1:
             for r in entities['room']:
                 self.logger.info("MR:Attempting to send {0} to the {1} in the {2}".format(entities['command'][0],
