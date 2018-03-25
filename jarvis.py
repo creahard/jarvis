@@ -14,18 +14,22 @@ from rasa_nlu.config import RasaNLUConfig
 from rasa_nlu.model import Trainer
 from rasa_nlu.model import Metadata, Interpreter
  
-import code
+import code,time
+from datetime import datetime
+import requests,re
 from actions import ActionManager
 
+
+logger = logging.getLogger(__name__)
+coloredlogs.install(logger=logger,level="INFO")
 
 class JarvisInterface:
 
     def __init__(self,room,name='Jarvis',nluinternal = True,loglevel='WARN'):
         self.room = room
         self.nluinternal = nluinternal
-        self.logger = logging.getLogger(name)
-        coloredlogs.install(level=loglevel,logger=self.logger)
-
+        self.conversation = []
+        logger.setLevel(loglevel)
 
     def train_nlu(self):
         training_data = load_data('nlu.json')
@@ -37,14 +41,21 @@ class JarvisInterface:
     def run(self,actionLoglevel='ERROR'):
         if self.nluinternal:
             self.nlu = Interpreter.load("models/nlu/default/current", RasaNLUConfig("config_spacy.json"))
-        self.action_mgr = ActionManager('Actions',actionLoglevel)
+        self.action_mgr = ActionManager(name='Actions',replyFunction=self.reply,logLevel=actionLoglevel)
         while True:
             req = raw_input(">> ")
             if req == "/quit":
+                fileName = time.strftime("%Y-%m-%d_%H-%M",time.localtime(self.conversation[0][0]))+"-convo.log"
+                print ("Saving conversation to "+fileName)
+                convoLog = open(fileName,"w")
+                for line in self.conversation:
+                    convoLog.write(time.strftime("%Y-%m-%d %H:%M:%S: ",time.localtime(line[0]))+line[1]+": "+line[2]+"\n")
+                convoLog.close()
                 exit(0)
             elif req == "/console":
                 code.interact(banner="Enter Ctrl-D to return control to the program",local=locals())
                 continue
+            self.conversation.append([ time.time(),'Me', req ])
             self.get_intent(req)
 
     def get_intent(self,req):
@@ -57,9 +68,9 @@ class JarvisInterface:
             import requests, json
             response = requests.post("http://localhost:5000/parse",json={"q":req})
             res = response.json()
-            self.logger.debug("NLU response is"+str(res))
-        intent = res['intent']['name']
-        self.logger.info("Intent is "+intent)
+            logger.debug("NLU response is"+str(res))
+        intent = str(res['intent']['name'])
+        logger.info("Intent is "+intent)
         entities = {}
         for entry in res['entities']:
             if entry['entity'] in entities:
@@ -67,7 +78,7 @@ class JarvisInterface:
             else:
                 entities[entry['entity']] = [ entry['value'] ]
         if entities:
-            self.logger.info("Entities found: "+str(entities))
+            logger.info("Entities found: "+str(entities))
 
         # Make sense of the request
         if intent == 'controlDevice':
@@ -76,53 +87,118 @@ class JarvisInterface:
             self.handle_device(entities,res['text'])
         else:
             try:
-                getattr(self.action_mgr, intent)(res)
+                getattr(self, intent)(res)
             except AttributeError as e:
-                self.logger.critical("Intention "+intent+" is defined in NLU but not in the DigitalAssistant module!")
-                print ("I'm sorry, but I cannot support this request at this time.")        
+                logger.critical("Intention "+intent+" is defined in NLU but not in the ActionManager module!")
+                logger.critical(dir(self.action_mgr))
+                self.reply ("I'm sorry, but I cannot support this request at this time.")
 
 
     def handle_device(self,entities,request_text):
         if not entities.has_key('command'):
-            self.logger.error("Cannot determine command to send to devices.")
+            logger.error("Cannot determine command to send to devices.")
             return -1
         if not entities.has_key('device'):
-            self.logger.error("Cannot identity device to command.")
+            logger.error("Cannot identity device to command.")
             return -1
 
         if entities.has_key('time'):
-            self.logger.critical("Control request for future action! "+str(entities['time']))
+            logger.critical("Control request for future action! "+str(entities['time']))
 
         if len(entities['command']) == 1 and len(entities['device']) == 1:
             for r in entities['room']:
-                self.logger.info("MR:Attempting to send {0} to the {1} in the {2}".format(entities['command'][0],
+                logger.info("MR:Attempting to send {0} to the {1} in the {2}".format(entities['command'][0],
                                                                                           entities['device'][0],r))
                 self.action_mgr.controlDevice(entities['device'][0],entities['command'][0],r)
         elif len(entities['room']) == 1 and len(entities['command']) == 1:
             for d in entities['device']:
-                self.logger.info("MD:Attempting to send {0} to the {1} in the {2}".format(entities['command'][0],
+                logger.info("MD:Attempting to send {0} to the {1} in the {2}".format(entities['command'][0],
                                                                                           d,entities['room'][0]))
                 self.action_mgr.controlDevice(d,entities['command'][0],entities['room'][0])
         elif len(entities['command']) > 1 and len(entities['device']) == 1:
-            self.logger.info("1-Received multiple commands, and rooms for one device. Attempting to split request.")
+            logger.info("1-Received multiple commands, and rooms for one device. Attempting to split request.")
             for index,attempt in enumerate(request_text.split(' and ',1)):
                 if index > 0:
                     self.get_intent(entities['device'][0]+" "+attempt)
                 else:
                     self.get_intent(attempt)
         elif len(entities['command']) > 1:
-            self.logger.info("2-Received multiple commands, rooms, and devices. Attempting to split request.")
+            logger.info("2-Received multiple commands, rooms, and devices. Attempting to split request.")
             for attempt in request_text.split(' and ',1):
                 self.get_intent(attempt)
         elif len(entities['command']) == 1 and len(entities['device']) > 1:
-            self.logger.info("3-Received multiple rooms and devices with one command. Attempting to split request.")
+            logger.info("3-Received multiple rooms and devices with one command. Attempting to split request.")
             for index,attempt in enumerate(request_text.split(' and ',1)):
                 if index > 0:
                     self.get_intent(entities['command'][0]+" "+attempt)
                 else:
                     self.get_intent(attempt)
         else:
-            self.logger.critical("4-Unhandled scenario: "+str(entities)+" from "+request_text)
+            logger.critical("4-Unhandled scenario: "+str(entities)+" from "+request_text)
+
+
+    def reply(self, msg):
+        self.conversation.append([ time.time(), 'Jarvis', msg])
+        print (msg)
+
+
+    def greet(self, res):
+        if datetime.now().hour < 12:
+            timeframe = "morning"
+        elif datetime.now().hour < 19:
+            timeframe = "afternoon"
+        else:
+            timeframe = "evening"
+        logger.info("Timeframe determined to be "+timeframe)
+        self.reply ("Good "+timeframe+", sir.")
+
+
+    def goodbye(self, res):
+        regex = re.compile(r'thank(s| you)', re.IGNORECASE)
+        if regex.search(res['text']):
+            logger.debug("Replying with 'You're welcome' due to regex match on "+res['text'])
+            self.reply ("You're welcome, sir")
+        else:
+            self.reply ("Goodbye, sir")
+
+
+    def time(self, res):
+        hour = datetime.now().hour
+        if hour < 12:
+            timeframe = "morning"
+        elif hour < 19:
+            timeframe = "afternoon"
+        else:
+            timeframe = "evening"
+        if hour > 13:
+            hour %= 12
+        elif hour == 0:
+            hour = 12
+        minute = datetime.now().minute
+        if minute == 0:
+            minute = "o'clock"
+        timeSentence = "{0}:{1:02d} in the {2}".format(hour,minute,timeframe)
+        logger.debug("Time determined to be "+timeSentence)
+        self.reply ("I have "+timeSentence)
+
+    def weather(self, res):
+        self.reply ("Accessing the weather.gov website...")
+        response = requests.get("https://api.weather.gov/stations/KDYB/observations/current"
+                                ,headers={'Accept':'application/json',
+                                          'user-agent':'Python/2.7; CentOS 7'})
+        if response.status_code != 200:
+            logger.error("Call to weather.gov returned "+response.status_code+":"+response.reason)
+            self.reply ("I'm affraid there was a problem accessing the site.");
+            return
+        weather = response.json()
+        logger.debug("Weather.gov returned "+str(weather))
+        temperature = weather['properties']['temperature']['value']
+        conditions = weather['properties']['textDescription']
+        if not isinstance(temperature,float):
+            logger.warning("Temperature unavailable from weather.gov...")
+            self.reply ("It is currently {0}, but I cannot get the temperature for some reason.".format(conditions))
+        else:
+            self.reply ("It is currently {0} and {1:.0f} degrees.".format(conditions,temperature*9/5+32))
 
 
 if __name__ == '__main__':
@@ -135,21 +211,19 @@ if __name__ == '__main__':
     parser.add_argument('--loglevel', dest='loglevel',
             choices=["DEBUG","INFO","WARN","ERROR","CRITICAL","NONE"],
             default="WARN",
-            help="Set the logging level for Jarvis")
+            help="Set the logger level for Jarvis")
 
     parser.add_argument('--actionloglevel', dest='actionloglevel',
             choices=["DEBUG","INFO","WARN","ERROR","CRITICAL","NONE"],
             default="WARN",
-            help="Set the logging level for the Action Manager")
+            help="Set the logger level for the Action Manager")
 
     parser.add_argument('--nluinternal', dest='nluinternal',
-            choices=["True","False"], default="True",
+            choices=["True","False"], default="False",
             help="Use internal or external NLU")
 
     loglevel = parser.parse_args().loglevel
     actionloglevel = parser.parse_args().actionloglevel
-    logger = logging.getLogger('Jarvis_Interface')
-    coloredlogs.install(level=loglevel,logger=logger)
 
     task = parser.parse_args().task
     if parser.parse_args().nluinternal == "False":
