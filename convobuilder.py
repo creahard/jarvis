@@ -8,77 +8,6 @@ training_data = {
         "common_examples": [
             {
                 "entities": [],
-                "intent": "greet",
-                "text": "hello"
-            },
-            {
-                "entities": [],
-                "intent": "greet",
-                "text": "hi"
-            },
-            {
-                "entities": [],
-                "intent": "greet",
-                "text": "hey"
-            },
-            {
-                "entities": [
-                    {
-                        "end": 12,
-                        "entity": "timeframe",
-                        "start": 5,
-                        "value": "morning"
-                    }
-                ],
-                "intent": "greet",
-                "text": "good morning"
-            },
-            {
-                "entities": [
-                    {
-                        "end": 14,
-                        "entity": "timeframe",
-                        "start": 5,
-                        "value": "afternoon"
-                    }
-                ],
-                "intent": "greet",
-                "text": "good afternoon"
-            },
-            {
-                "entities": [
-                    {
-                        "end": 12,
-                        "entity": "timeframe",
-                        "start": 5,
-                        "value": "evening"
-                    }
-                ],
-                "intent": "greet",
-                "text": "good evening"
-            },
-            {
-                "entities": [],
-                "intent": "goodbye",
-                "text": "goodbye"
-            },
-            {
-                "entities": [],
-                "intent": "goodbye",
-                "text": "bye"
-            },
-            {
-                "entities": [],
-                "intent": "goodbye",
-                "text": "later"
-            },
-            {
-                "entities": [],
-                "intent": "goodbye",
-                "text": "thank you"
-            },
-            {
-                "entities": [],
                 "intent": "affirm",
                 "text": "yes"
             },
@@ -136,83 +65,6 @@ training_data = {
                 "entities": [],
                 "intent": "deny",
                 "text": "negative"
-            },
-            {
-                "entities": [
-                    {
-                        "end": 17,
-                        "entity": "location",
-                        "start": 10,
-                        "value": "outside"
-                    }
-                ],
-                "intent": "weather",
-                "text": "how is it outside"
-            },
-            {
-                "entities": [
-                    {
-                        "end": 29,
-                        "entity": "location",
-                        "start": 25,
-                        "value": "here"
-                    }
-                ],
-                "intent": "weather",
-                "text": "what is the weather like here"
-            },
-            {
-                "entities": [
-                    {
-                        "end": 28,
-                        "entity": "timeframe",
-                        "start": 23,
-                        "value": "today"
-                    }
-                ],
-                "intent": "weather",
-                "text": "what does it look like today"
-            },
-            {
-                "entities": [],
-                "intent": "weather",
-                "text": "will I need an umbrella"
-            },
-            {
-                "entities": [
-                    {
-                        "end": 9,
-                        "entity": "clock",
-                        "start": 5,
-                        "value": "time"
-                    }
-                ],
-                "intent": "time",
-                "text": "what time is it"
-            },
-            {
-                "entities": [
-                    {
-                        "end": 20,
-                        "entity": "clock",
-                        "start": 16,
-                        "value": "time"
-                    }
-                ],
-                "intent": "time",
-                "text": "do you have the time"
-            },
-            {
-                "entities": [
-                    {
-                        "end": 27,
-                        "entity": "timeframe",
-                        "start": 24,
-                        "value": "now"
-                    }
-                ],
-                "intent": "time",
-                "text": "what does the clock say now"
             }
         ],
         "entity_synonyms": [
@@ -247,6 +99,35 @@ training_data = {
 items = ["light", "lights", "fan", "tv", "radio", "cable box", "dvd player", "bluray player"]
 # Rooms are {1} in formatted strings
 rooms = ["kitchen", "dining room", "living room", "bedroom", "bathroom", "family room", "master bedroom", "guest bedroom", "guest bathroom", "back porch", "front porch", "porch", "foyer", "hall", "hallway", "garage", "office", "study", "library"]
+
+greet = [
+["hello"],
+["hey"],
+["hi"],
+["good morning",{'timeframe':'morning'}],
+["good afternoon",{'timeframe':'afternoon'}],
+["good evening",{'timeframe':'evening'}],
+]
+
+goodbye = [
+"goodbye",
+"bye",
+"later",
+"thank you"
+]
+
+weather = [
+"how is it outside",
+"what is the weather",
+"what does it look like today",
+"will I need an umbrella"
+]
+
+intent_time = [
+"what time is it",
+"do you have the time",
+"what does the clock say now"
+]
 
 lines = [
 "please turn on the {0} in the {1}",
@@ -340,7 +221,7 @@ def buildEntity(line,room="",item="",time=""):
         entity['entities'].append({
                 'start': start, 'end': end,
                 'value': room, 'entity': 'room'})
-    if line.find('{0}'):
+    if line.find('{0}') > -1:
         [start, end] = sne(entity['text'],item)
         entity['entities'].append({
                 'start': start, 'end': end,
@@ -363,13 +244,34 @@ def buildEntity(line,room="",item="",time=""):
             entity['entities'].append({
                     'start': start, 'end': end,
                     'value': 'off', 'entity': 'command'})
-    if line.find('{2}'):
+    if line.find('{2}') > -1:
         [start, end] = sne(entity['text'],time)
         entity['entities'].append({
                 'start': start, 'end': end,
                 'value': time, 'entity': 'time'})
 
     return entity
+
+for g in greet:
+    entry = {}
+    entry['text']   = g[0]
+    entry['intent'] = 'greet'
+    entry['entities'] = []
+    if len(g) > 1:
+        for entity,value in g[1].iteritems():
+            p = re.compile(r'\b'+value+r'\b')
+            [start,end] = p.search(g[0]).span()
+            entry['entities'].append({'start':start,'end':end,'value':value,'entity':entity})
+    training_data['rasa_nlu_data']['common_examples'].append(entry)
+
+for g in goodbye:
+    training_data['rasa_nlu_data']['common_examples'].append({'intent':'goodbye','text':g,'entities': []})
+
+for w in weather:
+    training_data['rasa_nlu_data']['common_examples'].append({'intent':'weather','text':w,'entities': []})
+
+for t in intent_time:
+    training_data['rasa_nlu_data']['common_examples'].append({'intent':'time','text':t,'entities': []})
 
 for line in lines:
    for i in items:
