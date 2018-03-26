@@ -197,6 +197,19 @@ schedules = [
 "please kill the {0} {2}",
 "{2} kill the {0} in the {1}"]
 
+intent_timers = [
+"give me a {0} timer for {1}",
+"give me a timer for {1}",
+"let me know when {1} have past",
+"tell me when it's been {1}",
+"tell me when {1} have past",
+"I need a {1} timer for {0}"]
+
+notices = [
+"let me know when it is {0}",
+"tell me when it is {0}",
+]
+
 # Start and End - Just return the start and end of item in string
 def sne(string,item):
     start = string.find(item)
@@ -306,7 +319,7 @@ for line in queries:
            if line.find('{1}') == -1:
                break
 
-times = ["five minutes", "ten pm", "one hour", "four hours", "eight am", "sixteen thirty", "noon", "midnight", "a half hour", "half an hour"]
+times = ["five minutes", "ten pm", "one hour", "four hours", "eight am", "sixteen thirty", "noon", "midnight", "a half hour", "half an hour", "eleven o'clock"]
 for l in schedules:
    for i in items:
        for r in rooms:
@@ -316,6 +329,37 @@ for l in schedules:
                training_data['rasa_nlu_data']['common_examples'].append(entity)
            if l.find('{1}') == -1:
                break
+
+timers = ["five minutes", "one hour", "four hours", "three minutes fourty five seconds", "one minute", "sixty seconds", "three minutes and thirty seconds", "a half hour", "half an hour"]
+for l in intent_timers:
+   for t in timers:
+       for task in ["egg","laundry","cooking","nap","exersize","break"]:
+          entry = {}
+          entry['text']   = l.format(task,t)
+          entry['intent'] = 'timer'
+          entry['entities'] = []
+          p = re.compile(r'\b'+t+r'\b')
+          [start,end] = p.search(entry['text']).span()
+          entry['entities'].append({'start':start,'end':end,'value':t,'entity':'time'})
+          if l.find('{0}') > -1:
+              p = re.compile(r'\b'+task+r'\b')
+              [start,end] = p.search(entry['text']).span()
+              entry['entities'].append({'start':start,'end':end,'value':task,'entity':'task'})
+          training_data['rasa_nlu_data']['common_examples'].append(entry)
+          if l.find('{0}') == -1:
+              break
+
+times = ["five o'clock", "ten pm", "one am", "fourteen hundred", "eight am", "sixteen thirty", "noon", "midnight", "eleven o'clock"]
+for l in notices:
+   for t in times:
+      entry = {}
+      entry['text']   = l.format(t)
+      entry['intent'] = 'notify'
+      entry['entities'] = []
+      p = re.compile(r'\b'+t+r'\b')
+      [start,end] = p.search(entry['text']).span()
+      entry['entities'].append({'start':start,'end':end,'value':t,'entity':'time'})
+      training_data['rasa_nlu_data']['common_examples'].append(entry)
 
 print (json.dumps(training_data))
 
