@@ -199,11 +199,13 @@ schedules = [
 
 intent_timers = [
 "give me a {0} timer for {1}",
+"give me an {0} timer for {1}",
 "give me a timer for {1}",
 "let me know when {1} have past",
 "tell me when it's been {1}",
 "tell me when {1} have past",
-"I need a {1} timer for {0}"]
+"I need a {1} timer for {0}",
+"I need an {1} timer for {0}"]
 
 notices = [
 "let me know when it is {0}",
