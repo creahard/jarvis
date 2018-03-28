@@ -6,7 +6,8 @@ Notification times will refer to the next day if the specified time has already 
 import time
 from word2number import w2n
 
-listing = ["ninety seconds", "when an hour", "when a minute", "ten minutes", "three hours", "half an hour", "sixteen thirty", "seven pm", "ten minutes and thirty seconds", "seven thirty am", "five thirty pm"]
+listing = ["ninety seconds", "when an hour", "when a minute", "ten minutes", "three hours", "half an hour", "two and a half hours", "three hours and forty five minutes", 
+           "sixteen thirty", "seven pm", "ten minutes and thirty seconds", "seven thirty am", "five thirty pm"]
 
 
 def getTime(string):
@@ -18,18 +19,21 @@ def getTime(string):
 
         except ValueError as e:
             if w.find('hour') == 0:
+                if string.find('half') != -1:
+                    tokens.append(1800)
                 if len(tokens) == 0:
-                    if string.find('half') != -1:
-                        tokens.append(3600/2)
-                    else:
-                        tokens.append(3600)
-                elif isinstance(tokens[-1],int):
-                    tokens[-1] *= 3600
+                    tokens.append(3600)
+                else:
+                    for i in range(0,len(tokens)):
+                        if tokens[i] < 1800:
+                            tokens[i] *= 3600
             elif w.find('minute') == 0:
                 if len(tokens) == 0:
                     tokens.append(60)
-                elif isinstance(tokens[-1],int):
-                    tokens[-1] *= 60
+                elif len(tokens) > 0:
+                    for i in range(0,len(tokens)):
+                        if tokens[i] < 60:
+                            tokens[i] *= 60
             elif w.find('pm') == 0:
                 if isinstance(tokens[0],int):
                     tokens[0] += 12
