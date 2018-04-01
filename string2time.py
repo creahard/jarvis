@@ -1,6 +1,6 @@
 #!/bin/python
 """Attempt to convert strings into actual times.
-Timer intents will have relative times to be converted into actual Notification times
+Timer intents will return relative times in integer seconds.
 Notification times will refer to the next day if the specified time has already passed
 """
 import time,code
@@ -8,9 +8,13 @@ from word2number import w2n
 
 class InvalidTime(Exception):
     def __init__(self,msg):
-        Exception.__init__(self,"Cannot determine time from"+msg)
+        Exception.__init__(self,msg)
 
-def getTime(string):
+def convert(string):
+    if isinstance(string,list):
+        string = ''.join(string)
+    if isinstance(string,unicode):
+        string = string.encode('ascii')
     tokens = []
     for inx,w in enumerate(string.split( )):
         try:
