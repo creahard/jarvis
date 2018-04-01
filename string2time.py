@@ -3,16 +3,15 @@
 Timer intents will have relative times to be converted into actual Notification times
 Notification times will refer to the next day if the specified time has already passed
 """
-import time
+import time,code
 from word2number import w2n
 
-listing = ["ninety seconds", "when an hour", "when a minute", "ten minutes", "three hours", "half an hour", "two and a half hours", "three hours and forty five minutes", "thirty eight seconds",
-           "sixteen thirty", "seven pm", "ten minutes and thirty seconds", "seven thirty am", "five thirty pm"]
-
+class InvalidTime(Exception):
+    def __init__(self,msg):
+        Exception.__init__(self,"Cannot determine time from"+msg)
 
 def getTime(string):
     tokens = []
-    event = 0
     for inx,w in enumerate(string.split( )):
         try:
             tokens.append(w2n.word_to_num(w))
@@ -49,7 +48,6 @@ def getTime(string):
         return "{0}:00".format(tokens[0])
     elif len(tokens) == 2:
         return "{0}:{1}".format(tokens[0],tokens[1])
+    else:
+        raise InvalidTime(string)
 
-
-for l in listing:
-    print (l+" "+str(getTime(l)))
