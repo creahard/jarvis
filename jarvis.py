@@ -54,7 +54,7 @@ class JarvisInterface:
         self.timers.start()
 
         try:
-            while True:
+            while self.timers.isAlive():
                 while not self._queue.empty():
                     self.reply(self._queue.get())
                     self._queue.task_done()
@@ -80,6 +80,8 @@ class JarvisInterface:
                 convoLog.write(time.strftime("%Y-%m-%d %H:%M:%S: ",
                            time.localtime(line[0]))+line[1]+": "+line[2]+"\n")
             convoLog.close()
+            if not self.timers.isAlive():
+                logger.crit("Timer thread died unexpectedly!")
             self.timers.stopInput()
             self.timers.join()
 
