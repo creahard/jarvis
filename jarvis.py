@@ -17,8 +17,11 @@ from rasa_nlu.model import Metadata, Interpreter
 import code,time
 from datetime import datetime
 import requests,re
-from actions import ActionManager
+from Queue import Queue
 
+
+from actions import ActionManager
+from assistantTimers import assistantTimers
 
 logger = logging.getLogger(__name__)
 coloredlogs.install(logger=logger,level="INFO")
@@ -35,28 +38,50 @@ class JarvisInterface:
         training_data = load_data('nlu.json')
         trainer = Trainer(RasaNLUConfig("config_spacy.json"))
         trainer.train(training_data)
-        model_directory = trainer.persist('models/nlu/', fixed_model_name="current")
+        model_directory = trainer.persist('models/nlu/',
+                                          fixed_model_name="current")
 
 
     def run(self,actionLoglevel='ERROR'):
         if self.nluinternal:
-            self.nlu = Interpreter.load("models/nlu/default/current", RasaNLUConfig("config_spacy.json"))
-        self.action_mgr = ActionManager(name='Actions',replyFunction=self.reply,logLevel=actionLoglevel)
-        while True:
-            req = raw_input(">> ")
-            if req == "/quit":
-                fileName = time.strftime("%Y-%m-%d_%H-%M",time.localtime(self.conversation[0][0]))+"-convo.log"
-                print ("Saving conversation to "+fileName)
-                convoLog = open(fileName,"w")
-                for line in self.conversation:
-                    convoLog.write(time.strftime("%Y-%m-%d %H:%M:%S: ",time.localtime(line[0]))+line[1]+": "+line[2]+"\n")
-                convoLog.close()
-                exit(0)
-            elif req == "/console":
-                code.interact(banner="Enter Ctrl-D to return control to the program",local=locals())
-                continue
-            self.conversation.append([ time.time(),'Me', req ])
-            self.get_intent(req)
+            self.nlu = Interpreter.load("models/nlu/default/current",
+                                        RasaNLUConfig("config_spacy.json"))
+        self.action_mgr = ActionManager(name='Actions',
+                                        replyFunction=self.reply,
+                                        logLevel=actionLoglevel)
+        self._queue = Queue(maxsize = 5)
+        self.timers = assistantTimers(replyQueue=self._queue, logLevel=actionLoglevel)
+        self.timers.start()
+
+        try:
+            while True:
+                while not self._queue.empty():
+                    self.reply(self._queue.get())
+                    self._queue.task_done()
+                req = raw_input(">> ")
+                if req == '':
+                    continue
+                elif req == "/quit":
+                    break
+                elif req == "/console":
+                    txt = "Enter Ctrl-D to return control to the program"
+                    code.interact(banner=txt,local=locals())
+                    continue
+                self.conversation.append([ time.time(),'Me', req ])
+                self.get_intent(req)
+        except KeyboardInterrupt:
+            logger.warn("Exiting from Keyboard Interrupt!")
+        finally:
+            fileName = time.strftime("%Y-%m-%d_%H-%M",
+                         time.localtime(self.conversation[0][0]))+"-convo.log"
+            logger.info("Saving conversation to "+fileName)
+            convoLog = open(fileName,"w")
+            for line in self.conversation:
+                convoLog.write(time.strftime("%Y-%m-%d %H:%M:%S: ",
+                           time.localtime(line[0]))+line[1]+": "+line[2]+"\n")
+            convoLog.close()
+            self.timers.stopInput()
+            self.timers.join()
 
     def get_intent(self,req):
         if nluinternal:
@@ -66,7 +91,8 @@ class JarvisInterface:
                 res = self.nlu.parse(unicode(req,"utf-8"))
         else:
             import requests, json
-            response = requests.post("http://localhost:5000/parse",json={"q":req})
+            response = requests.post("http://localhost:5000/parse",
+                                     json={"q":req})
             res = response.json()
             logger.debug("NLU response is"+str(res))
         intent = str(res['intent']['name'])
@@ -85,6 +111,9 @@ class JarvisInterface:
             if not entities.has_key('room'):
                 entities['room'] = [ self.room ]
             self.handle_device(entities,res['text'])
+        elif intent == 'timer':
+            logger.debug("Timer called with entities: "+str(entities))
+            self.timers.addTimer(entities)
         else:
             try:
                 getattr(self, intent)(res)
@@ -107,14 +136,16 @@ class JarvisInterface:
 
         if len(entities['command']) == 1 and len(entities['device']) == 1:
             for r in entities['room']:
-                logger.info("MR:Attempting to send {0} to the {1} in the {2}".format(entities['command'][0],
-                                                                                          entities['device'][0],r))
-                self.action_mgr.controlDevice(entities['device'][0],entities['command'][0],r)
+                logger.info("MR:Attempting to send {0} to the {1} in the {2}".format(entities['command'][0],entities['device'][0],r))
+                self.action_mgr.controlDevice(entities['device'][0],
+                                              entities['command'][0],
+                                              r)
         elif len(entities['room']) == 1 and len(entities['command']) == 1:
             for d in entities['device']:
-                logger.info("MD:Attempting to send {0} to the {1} in the {2}".format(entities['command'][0],
-                                                                                          d,entities['room'][0]))
-                self.action_mgr.controlDevice(d,entities['command'][0],entities['room'][0])
+                logger.info("MD:Attempting to send {0} to the {1} in the {2}".format(entities['command'][0],d,entities['room'][0]))
+                self.action_mgr.controlDevice(d,
+                                              entities['command'][0],
+                                              entities['room'][0])
         elif len(entities['command']) > 1 and len(entities['device']) == 1:
             logger.info("1-Received multiple commands, and rooms for one device. Attempting to split request.")
             for index,attempt in enumerate(request_text.split(' and ',1)):
@@ -230,7 +261,9 @@ if __name__ == '__main__':
         nluinternal = False
     else:
         nluinternal = True
-    jarvis = JarvisInterface(room="office",nluinternal=nluinternal,loglevel=loglevel)
+    jarvis = JarvisInterface(room="office",
+                             nluinternal=nluinternal,
+                             loglevel=loglevel)
 
     if task == "train":
         logger.info("Beginning training process...")

@@ -2,16 +2,22 @@
 
 from __future__ import print_function
 
-import time,threading,sys
+import time,threading,sys,coloredlogs,logging
+from Queue import Queue
 
 import string2time
 
+logger = logging.getLogger(__name__)
+coloredlogs.install(logger=logger,level='WARN')
+
 class assistantTimers(threading.Thread):
-    def __init__(self):
+    def __init__(self,replyQueue,logLevel='WARN'):
         threading.Thread.__init__(self)
         self.event = threading.Event()
         self.cond  = threading.Condition()
         self.timers = []
+        logger.setLevel(logLevel)
+        self._queue = replyQueue
 
     def run(self):
         self.event.set()
@@ -23,9 +29,9 @@ class assistantTimers(threading.Thread):
                 break
             delay = self._getDelay()
         if len(self.timers) is not 0:
-            print ("Abandoning {0} timers".format(len(self.timers)))
+            logger.warn("Abandoning {0} timers".format(len(self.timers)))
             for timer in self.timers:
-                print (timer['name'])
+                logger.debug(timer['name'])
         self.cond.release()
 
     def stopInput(self):
@@ -39,7 +45,7 @@ class assistantTimers(threading.Thread):
             curTime = int(time.time())
             for timer in list(self.timers):
                if timer['time'] <= curTime:
-                  print ("Sir, your {0} timer has expired".format(timer['name']))
+                  self._queue.put("Sir, your {0} timer has expired".format(timer['name']))
                   self.cond.acquire()
                   self.timers.remove(timer)
                   self.cond.release()
@@ -70,6 +76,7 @@ class assistantTimers(threading.Thread):
             self.timers.append({'time':timeVal,'name':''.join(entities['task'])})
         else:
             self.timers.append({'time':timeVal,'name':''.join(entities['time'])})
+        logger.debug("Added {0} to be triggered in {1}".format(self.timers[-1]['name'],(timeVal-curTime)))
         self.cond.notify()
         self.cond.release()
 
@@ -81,10 +88,10 @@ class assistantTimers(threading.Thread):
         try:
             self.timers.remove(timer)
             # Announce Queue that it has been removed
-            print ("Your {0} timer has been removed, sir".format(timer['name']))
+            self._queue.put("Your {0} timer has been removed, sir".format(timer['name']))
             self.cond.notify()
         except ValueError:
             # Announce Queue that it cannot be found
-            print ("I cound not find that timer, sir.")
+            self._queue.put("I cound not find that timer, sir.")
         finally:
             self.cond.release()
