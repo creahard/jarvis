@@ -1,7 +1,7 @@
 #!/bin/python
 """Provide non-blocking input as a thread. Expects a Queue to send inputs back"""
 
-import coloredlogs,logging,threading,Queue,sys
+import coloredlogs,logging,threading,Queue,sys,traceback
 
 
 logger = logging.getLogger(__name__)
@@ -26,10 +26,11 @@ class nonBlockingInput(threading.Thread):
                 data = {'origin': 'user', 'msg': req}
                 self.queue.put(data)
             except EOFError:
-                print ("Standby while the application shuts down...")
+                logger.info("Standby while the application shuts down...")
                 break
             except:
-                print (sys.exc_info())
+                logger.critical(traceback.print_exc())
                 break
         logging.info("Thread is shutting down.")
+        self.queue.put({'origin': 'user', 'msg': '/quit'})
 

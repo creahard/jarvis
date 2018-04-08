@@ -58,25 +58,25 @@ class JarvisInterface:
         self.nbi = nonBlockingInput(self._queue)
         self.nbi.daemon = True
         self.nbi.start()
-        print("> ",)
+        print("> ", end='') 
         while self.timers.isAlive() and self.nbi.isAlive():
             try:
-                req = self._queue.get(False, 10.0)
+                req = self._queue.get(True, 60.0)
                 if req['origin'] == 'user':
                     if req['msg'] == "/quit":
                         break
                     elif req['msg'] == '':
-                        print("> ",)
+                        print("> ", end='')
                         continue
                     elif req['msg'] == "/console":
                         txt = "Enter Ctrl-D to return to the program"
                         code.interact(banner=txt,local=locals())
                         continue
                     self.getIntent(req['msg'])
-                    print("> ",)
+                    print("> ", end='')
                 else:
                     self.handleJob(req)
-                    print("> ",)
+                    print("> ", end='')
             except Queue.Empty:
                 continue
             except KeyboardInterrupt:
@@ -195,7 +195,7 @@ class JarvisInterface:
             self.timers.addTimer('timer',job['entities'])
         else:
             msg = "Your {0} timer has expired, sir"
-            msg = msg.format(job['entities']['task'])
+            msg = msg.format(''.join(job['entities']['task']).encode('ascii'))
             self.notify({'intent': job['intent'], 'msg': msg})
 
 
