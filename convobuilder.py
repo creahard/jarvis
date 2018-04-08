@@ -120,7 +120,10 @@ weather = [
 "how is it outside",
 "what is the weather",
 "what does it look like today",
-"will I need an umbrella"
+"will I need an umbrella",
+"is it nice outside",
+"how hot is it now",
+"how cold is it now"
 ]
 
 intent_time = [

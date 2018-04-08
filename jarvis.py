@@ -14,14 +14,15 @@ from rasa_nlu.config import RasaNLUConfig
 from rasa_nlu.model import Trainer
 from rasa_nlu.model import Metadata, Interpreter
  
-import code,time
+import code,time,sys,traceback
 from datetime import datetime
 import requests,re
-from Queue import Queue
+import Queue
 
 
 from actions import ActionManager
 from assistantTimers import assistantTimers
+from nonblockinginput import nonBlockingInput
 
 logger = logging.getLogger(__name__)
 coloredlogs.install(logger=logger,level="INFO")
@@ -30,6 +31,7 @@ class JarvisInterface:
 
     def __init__(self,room,name='Jarvis',nluinternal = True,loglevel='WARN'):
         self.room = room
+        self.name = name
         self.nluinternal = nluinternal
         self.conversation = []
         logger.setLevel(loglevel)
@@ -47,45 +49,60 @@ class JarvisInterface:
             self.nlu = Interpreter.load("models/nlu/default/current",
                                         RasaNLUConfig("config_spacy.json"))
         self.action_mgr = ActionManager(name='Actions',
-                                        replyFunction=self.reply,
+                                        replyFunction=self.notify,
                                         logLevel=actionLoglevel)
-        self._queue = Queue(maxsize = 5)
-        self.timers = assistantTimers(replyQueue=self._queue, logLevel=actionLoglevel)
+        self._queue = Queue.Queue(maxsize = 5)
+        self.timers = assistantTimers(replyQueue=self._queue,
+                                      logLevel=actionLoglevel)
         self.timers.start()
+        self.nbi = nonBlockingInput(self._queue)
+        self.nbi.daemon = True
+        self.nbi.start()
+        print("> ",)
+        while self.timers.isAlive() and self.nbi.isAlive():
+            try:
+                req = self._queue.get(False, 10.0)
+                if req['origin'] == 'user':
+                    if req['msg'] == "/quit":
+                        break
+                    elif req['msg'] == '':
+                        print("> ",)
+                        continue
+                    elif req['msg'] == "/console":
+                        txt = "Enter Ctrl-D to return to the program"
+                        code.interact(banner=txt,local=locals())
+                        continue
+                    self.getIntent(req['msg'])
+                    print("> ",)
+                else:
+                    self.handleJob(req)
+                    print("> ",)
+            except Queue.Empty:
+                continue
+            except KeyboardInterrupt:
+                logger.warn("Exiting from Keyboard Interrupt!")
+                break
+            except:
+                logger.critical(traceback.print_exc())
+                break
+        if not self.timers.isAlive():
+            logger.critical("Timer thread is dead!")
+        if not self.nbi.isAlive():
+            logger.critical("Non blocking input thread is dead!")
 
-        try:
-            while self.timers.isAlive():
-                while not self._queue.empty():
-                    self.reply(self._queue.get())
-                    self._queue.task_done()
-                req = raw_input(">> ")
-                if req == '':
-                    continue
-                elif req == "/quit":
-                    break
-                elif req == "/console":
-                    txt = "Enter Ctrl-D to return control to the program"
-                    code.interact(banner=txt,local=locals())
-                    continue
-                self.conversation.append([ time.time(),'Me', req ])
-                self.get_intent(req)
-        except KeyboardInterrupt:
-            logger.warn("Exiting from Keyboard Interrupt!")
-        finally:
-            fileName = time.strftime("%Y-%m-%d_%H-%M",
-                         time.localtime(self.conversation[0][0]))+"-convo.log"
-            logger.info("Saving conversation to "+fileName)
-            convoLog = open(fileName,"w")
-            for line in self.conversation:
-                convoLog.write(time.strftime("%Y-%m-%d %H:%M:%S: ",
-                           time.localtime(line[0]))+line[1]+": "+line[2]+"\n")
-            convoLog.close()
-            if not self.timers.isAlive():
-                logger.crit("Timer thread died unexpectedly!")
-            self.timers.stopInput()
-            self.timers.join()
+        fileName = time.strftime("%Y%m%d-%H%M-convo.log",
+                                 time.localtime(self.conversation[0][0]))
+        logger.info("Saving conversation to "+fileName)
+        convoLog = open(fileName,"w")
+        for line in self.conversation:
+            convoLog.write(time.strftime("%Y-%m-%d %H:%M:%S: ", time.localtime(line[0]))+line[1]+": "+line[2]+"\n")
+        convoLog.close()
+        if not self.timers.isAlive():
+            logger.critical("Timer thread died unexpectedly!")
+        self.timers.stopInput()
+        self.timers.join()
 
-    def get_intent(self,req):
+    def getIntent(self,req):
         if nluinternal:
             if isinstance(req, unicode):
                 res = self.nlu.parse(req)
@@ -97,8 +114,9 @@ class JarvisInterface:
                                      json={"q":req})
             res = response.json()
             logger.debug("NLU response is"+str(res))
-        intent = str(res['intent']['name'])
+        intent = res['intent']['name'].encode('ascii')
         logger.info("Intent is "+intent)
+        self.conversation.append([ time.time(),'Me', res['text'], intent ])
         entities = {}
         for entry in res['entities']:
             if entry['entity'] in entities:
@@ -107,75 +125,28 @@ class JarvisInterface:
                 entities[entry['entity']] = [ entry['value'] ]
         if entities:
             logger.info("Entities found: "+str(entities))
-
+        job = {'origin': 'user',
+               'intent': intent,
+               'msg': res['text'].encode('ascii'),
+               'entities': entities}
         # Make sense of the request
         if intent == 'controlDevice':
             if not entities.has_key('room'):
                 entities['room'] = [ self.room ]
             self.handle_device(entities,res['text'])
-        elif intent == 'timer':
-            logger.debug("Timer called with entities: "+str(entities))
-            self.timers.addTimer(entities)
         else:
-            try:
-                getattr(self, intent)(res)
-            except AttributeError as e:
-                logger.critical("Intention "+intent+" is defined in NLU but not in the ActionManager module!")
-                logger.critical(dir(self.action_mgr))
-                self.reply ("I'm sorry, but I cannot support this request at this time.")
+            self.handleJob(job)
 
 
-    def handle_device(self,entities,request_text):
-        if not entities.has_key('command'):
-            logger.error("Cannot determine command to send to devices.")
-            return -1
-        if not entities.has_key('device'):
-            logger.error("Cannot identity device to command.")
-            return -1
-
-        if entities.has_key('time'):
-            logger.critical("Control request for future action! "+str(entities['time']))
-
-        if len(entities['command']) == 1 and len(entities['device']) == 1:
-            for r in entities['room']:
-                logger.info("MR:Attempting to send {0} to the {1} in the {2}".format(entities['command'][0],entities['device'][0],r))
-                self.action_mgr.controlDevice(entities['device'][0],
-                                              entities['command'][0],
-                                              r)
-        elif len(entities['room']) == 1 and len(entities['command']) == 1:
-            for d in entities['device']:
-                logger.info("MD:Attempting to send {0} to the {1} in the {2}".format(entities['command'][0],d,entities['room'][0]))
-                self.action_mgr.controlDevice(d,
-                                              entities['command'][0],
-                                              entities['room'][0])
-        elif len(entities['command']) > 1 and len(entities['device']) == 1:
-            logger.info("1-Received multiple commands, and rooms for one device. Attempting to split request.")
-            for index,attempt in enumerate(request_text.split(' and ',1)):
-                if index > 0:
-                    self.get_intent(entities['device'][0]+" "+attempt)
-                else:
-                    self.get_intent(attempt)
-        elif len(entities['command']) > 1:
-            logger.info("2-Received multiple commands, rooms, and devices. Attempting to split request.")
-            for attempt in request_text.split(' and ',1):
-                self.get_intent(attempt)
-        elif len(entities['command']) == 1 and len(entities['device']) > 1:
-            logger.info("3-Received multiple rooms and devices with one command. Attempting to split request.")
-            for index,attempt in enumerate(request_text.split(' and ',1)):
-                if index > 0:
-                    self.get_intent(entities['command'][0]+" "+attempt)
-                else:
-                    self.get_intent(attempt)
-        else:
-            logger.critical("4-Unhandled scenario: "+str(entities)+" from "+request_text)
+    def notify(self, req):
+        self.conversation.append([time.time(),
+                                  'Jarvis',
+                                  req['msg'],
+                                  req['intent']])
+        print (req['msg'])
 
 
-    def reply(self, msg):
-        self.conversation.append([ time.time(), 'Jarvis', msg])
-        print (msg)
-
-
-    def greet(self, res):
+    def greet(self, job):
         if datetime.now().hour < 12:
             timeframe = "morning"
         elif datetime.now().hour < 19:
@@ -183,19 +154,22 @@ class JarvisInterface:
         else:
             timeframe = "evening"
         logger.info("Timeframe determined to be "+timeframe)
-        self.reply ("Good "+timeframe+", sir.")
+        self.notify({'intent': job['intent'],
+                     'msg': "Good "+timeframe+", sir."})
 
 
-    def goodbye(self, res):
+    def goodbye(self, job):
         regex = re.compile(r'thank(s| you)', re.IGNORECASE)
-        if regex.search(res['text']):
-            logger.debug("Replying with 'You're welcome' due to regex match on "+res['text'])
-            self.reply ("You're welcome, sir")
+        if regex.search(job['msg']):
+            logger.debug("Replying with 'You're welcome' due to regex match on " + job['msg'])
+            self.notify({'msg': "You're welcome, sir",
+                         'intent': job['intent']})
         else:
-            self.reply ("Goodbye, sir")
+            self.notify({'msg':"Goodbye, sir",
+                         'intent': job['intent']})
 
 
-    def time(self, res):
+    def time(self, job):
         hour = datetime.now().hour
         if hour < 12:
             timeframe = "morning"
@@ -212,26 +186,114 @@ class JarvisInterface:
             minute = "o'clock"
         timeSentence = "{0}:{1:02d} in the {2}".format(hour,minute,timeframe)
         logger.debug("Time determined to be "+timeSentence)
-        self.reply ("I have "+timeSentence)
+        self.notify({'msg': "I have "+timeSentence,
+                     'intent': job['intent']})
 
-    def weather(self, res):
-        self.reply ("Accessing the weather.gov website...")
-        response = requests.get("https://api.weather.gov/stations/KDYB/observations/current"
+
+    def timer(self, job):
+        if job['origin'] == 'user':
+            self.timers.addTimer('timer',job['entities'])
+        else:
+            msg = "Your {0} timer has expired, sir"
+            msg = msg.format(job['entities']['task'])
+            self.notify({'intent': job['intent'], 'msg': msg})
+
+
+    def weather(self, job):
+        logger.info("Accessing the weather.gov website...")
+        response = requests.get("https://api.weather.gov" \
+                                "/stations/KDYB/observations/current"
                                 ,headers={'Accept':'application/json',
-                                          'user-agent':'Python/2.7; CentOS 7'})
+                                      'user-agent':'Python/2.7; CentOS 7'})
         if response.status_code != 200:
-            logger.error("Call to weather.gov returned "+response.status_code+":"+response.reason)
-            self.reply ("I'm affraid there was a problem accessing the site.");
+            logger.error("Call to weather.gov returned " \
+                         +response.status_code \
+                         +":"+response.reason)
+            msg = "I'm affraid there was a problem accessing the site."
+            self.notify({'intent': job['intent']})
             return
-        weather = response.json()
-        logger.debug("Weather.gov returned "+str(weather))
-        temperature = weather['properties']['temperature']['value']
-        conditions = weather['properties']['textDescription']
+        data = response.json()
+        logger.debug("Weather.gov returned "+str(data))
+        temperature = data['properties']['temperature']['value']
+        conditions = data['properties']['textDescription']
         if not isinstance(temperature,float):
             logger.warning("Temperature unavailable from weather.gov...")
-            self.reply ("It is currently {0}, but I cannot get the temperature for some reason.".format(conditions))
+            msg = "It is currently {0}, but I cannot get the temperature " \
+                  "for some reason."
+            msg = msg.format(conditions)
+        else:	
+            msg = "It is currently {0} and {1:.0f} degrees."
+            msg = msg.format(conditions,temperature*9/5+32)
+        self.notify({'intent': job['intent'], 'msg': msg})
+
+
+    def handle_device(self,entities,request_text):
+        if not entities.has_key('command'):
+            logger.error("Cannot determine command to send to devices.")
+            return -1
+        if not entities.has_key('device'):
+            logger.error("Cannot identity device to command.")
+            return -1
+
+        if entities.has_key('time'):
+            logger.critical("Control request for future action! "+str(entities['time']))
+
+        if len(entities['command']) == 1 and len(entities['device']) == 1:
+            for r in entities['room']:
+                log = "MR:Attempting to send {0} to the {1} in the {2}"
+                log = log.format(entities['command'][0],
+                                 entities['device'][0],r)
+                logger.info(log)
+                self.action_mgr.controlDevice(entities['device'][0],
+                                              entities['command'][0],
+                                              r)
+        elif len(entities['room']) == 1 and len(entities['command']) == 1:
+            for d in entities['device']:
+                log = "MD:Attempting to send {0} to the {1} in the {2}"
+                log = log.format(entities['command'][0],
+                                 d,
+                                 entities['room'][0])
+                self.action_mgr.controlDevice(d,
+                                              entities['command'][0],
+                                              entities['room'][0])
+        elif len(entities['command']) > 1 and len(entities['device']) == 1:
+            logger.info("1-Received multiple commands, and rooms for one " \
+                        "device. Attempting to split request.")
+            for index,attempt in enumerate(request_text.split(' and ',1)):
+                if index > 0:
+                    self.get_intent(entities['device'][0]+" "+attempt)
+                else:
+                    self.get_intent(attempt)
+        elif len(entities['command']) > 1:
+            logger.info("2-Received multiple commands, rooms, and devices." \
+                        " Attempting to split request.")
+            for attempt in request_text.split(' and ',1):
+                self.get_intent(attempt)
+        elif len(entities['command']) == 1 and len(entities['device']) > 1:
+            logger.info("3-Received multiple rooms and devices with one " \
+                        "command. Attempting to split request.")
+            for index,attempt in enumerate(request_text.split(' and ',1)):
+                if index > 0:
+                    self.get_intent(entities['command'][0]+" "+attempt)
+                else:
+                    self.get_intent(attempt)
         else:
-            self.reply ("It is currently {0} and {1:.0f} degrees.".format(conditions,temperature*9/5+32))
+            logger.critical("4-Unhandled scenario: " \
+                            +str(entities)+" from "+request_text)
+
+
+    def handleJob(self, job):
+        try:
+            getattr(self, job['intent'])(job)
+        except AttributeError as e:
+            logger.critical("Intention " +
+                            job['intent'] +
+                            " is defined in NLU but not in the" +
+                            " ActionManager module!")
+            logger.critical(dir(self))
+            msg = "I'm sorry, but I cannot support this request at this" \
+                  " time."
+            self.notify({'intent': job['intent'], 'msg': msg})
 
 
 if __name__ == '__main__':

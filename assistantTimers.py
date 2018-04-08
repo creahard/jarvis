@@ -8,10 +8,10 @@ from Queue import Queue
 import string2time
 
 logger = logging.getLogger(__name__)
-coloredlogs.install(logger=logger,level='WARN')
+coloredlogs.install(logger=logger,level='DEBUG')
 
 class assistantTimers(threading.Thread):
-    def __init__(self,replyQueue,logLevel='WARN'):
+    def __init__(self,replyQueue,logLevel='DEBUG'):
         threading.Thread.__init__(self)
         self.event = threading.Event()
         self.cond  = threading.Condition()
@@ -20,6 +20,7 @@ class assistantTimers(threading.Thread):
         self._queue = replyQueue
 
     def run(self):
+        logger.info("Timer thread started.")
         self.event.set()
         self.cond.acquire()
         delay = self._getDelay()
@@ -28,6 +29,7 @@ class assistantTimers(threading.Thread):
             if not self.event.is_set():
                 break
             delay = self._getDelay()
+        logger.info("Timer thread is shutting down.")
         if len(self.timers) is not 0:
             logger.warn("Abandoning {0} timers".format(len(self.timers)))
             for timer in self.timers:
@@ -45,7 +47,9 @@ class assistantTimers(threading.Thread):
             curTime = int(time.time())
             for timer in list(self.timers):
                if timer['time'] <= curTime:
-                  self._queue.put("Sir, your {0} timer has expired".format(timer['name']))
+                  self._queue.put({'origin': 'timer',
+                                   'intent': timer['intent'],
+                                   'entities': timer['entities']})
                   self.cond.acquire()
                   self.timers.remove(timer)
                   self.cond.release()
@@ -67,20 +71,23 @@ class assistantTimers(threading.Thread):
         return delay
 
 
-    def addTimer(self,entities):
+    def addTimer(self,intent,entities):
         self.cond.acquire()
         curTime = int(time.time())
         timeVal = string2time.convert(entities['time'])
         timeVal += curTime
-        if u'task' in entities:
-            self.timers.append({'time':timeVal,'name':''.join(entities['task'])})
-        else:
-            self.timers.append({'time':timeVal,'name':''.join(entities['time'])})
-        logger.debug("Added {0} to be triggered in {1}".format(self.timers[-1]['name'],(timeVal-curTime)))
+        if not u'task' in entities:
+            entities['task'] = ''.join(entities['time'])
+        entities.pop('time')
+        self.timers.append({'time':timeVal,
+                            'intent': intent,
+                            'entities': entities})
+        logger.info("Added {0} to be triggered in {1} seconds"
+                     .format(self.timers[-1]['intent'],(timeVal-curTime)))
         self.cond.notify()
         self.cond.release()
 
-    def listTimers(self):
+    def getTimers(self):
         return sorted(self.timers, key=lambda k: k['time'])
 
     def removeTimer(self,timer):
@@ -88,10 +95,13 @@ class assistantTimers(threading.Thread):
         try:
             self.timers.remove(timer)
             # Announce Queue that it has been removed
-            self._queue.put("Your {0} timer has been removed, sir".format(timer['name']))
+            logger.info("Timer {0} timer removed".format(timer['name']))
             self.cond.notify()
+            return True
         except ValueError:
             # Announce Queue that it cannot be found
-            self._queue.put("I cound not find that timer, sir.")
+            logger.warn("Timer {0} could not be found".format(timer['name']))
+            logger.debug(timer)
+            return False
         finally:
             self.cond.release()
