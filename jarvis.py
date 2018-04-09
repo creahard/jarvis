@@ -49,7 +49,7 @@ class JarvisInterface:
             self.nlu = Interpreter.load("models/nlu/default/current",
                                         RasaNLUConfig("config_spacy.json"))
         self.action_mgr = ActionManager(name='Actions',
-                                        replyFunction=self.notify,
+                                        replyFunction=self.reply,
                                         logLevel=actionLoglevel)
         self._queue = Queue.Queue(maxsize = 5)
         self.timers = assistantTimers(replyQueue=self._queue,
@@ -138,7 +138,7 @@ class JarvisInterface:
             self.handleJob(job)
 
 
-    def notify(self, req):
+    def reply(self, req):
         self.conversation.append([time.time(),
                                   'Jarvis',
                                   req['msg'],
@@ -154,7 +154,7 @@ class JarvisInterface:
         else:
             timeframe = "evening"
         logger.info("Timeframe determined to be "+timeframe)
-        self.notify({'intent': job['intent'],
+        self.reply({'intent': job['intent'],
                      'msg': "Good "+timeframe+", sir."})
 
 
@@ -162,10 +162,10 @@ class JarvisInterface:
         regex = re.compile(r'thank(s| you)', re.IGNORECASE)
         if regex.search(job['msg']):
             logger.debug("Replying with 'You're welcome' due to regex match on " + job['msg'])
-            self.notify({'msg': "You're welcome, sir",
+            self.reply({'msg': "You're welcome, sir",
                          'intent': job['intent']})
         else:
-            self.notify({'msg':"Goodbye, sir",
+            self.reply({'msg':"Goodbye, sir",
                          'intent': job['intent']})
 
 
@@ -186,7 +186,7 @@ class JarvisInterface:
             minute = "o'clock"
         timeSentence = "{0}:{1:02d} in the {2}".format(hour,minute,timeframe)
         logger.debug("Time determined to be "+timeSentence)
-        self.notify({'msg': "I have "+timeSentence,
+        self.reply({'msg': "I have "+timeSentence,
                      'intent': job['intent']})
 
 
@@ -196,7 +196,7 @@ class JarvisInterface:
         else:
             msg = "Your {0} timer has expired, sir"
             msg = msg.format(''.join(job['entities']['task']).encode('ascii'))
-            self.notify({'intent': job['intent'], 'msg': msg})
+            self.reply({'intent': job['intent'], 'msg': msg})
 
 
     def weather(self, job):
@@ -210,7 +210,7 @@ class JarvisInterface:
                          +response.status_code \
                          +":"+response.reason)
             msg = "I'm affraid there was a problem accessing the site."
-            self.notify({'intent': job['intent']})
+            self.reply({'intent': job['intent']})
             return
         data = response.json()
         logger.debug("Weather.gov returned "+str(data))
@@ -224,7 +224,7 @@ class JarvisInterface:
         else:	
             msg = "It is currently {0} and {1:.0f} degrees."
             msg = msg.format(conditions,temperature*9/5+32)
-        self.notify({'intent': job['intent'], 'msg': msg})
+        self.reply({'intent': job['intent'], 'msg': msg})
 
 
     def handle_device(self,entities,request_text):
@@ -293,7 +293,7 @@ class JarvisInterface:
             logger.critical(dir(self))
             msg = "I'm sorry, but I cannot support this request at this" \
                   " time."
-            self.notify({'intent': job['intent'], 'msg': msg})
+            self.reply({'intent': job['intent'], 'msg': msg})
 
 
 if __name__ == '__main__':
