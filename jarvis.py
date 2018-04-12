@@ -49,7 +49,6 @@ class JarvisInterface:
             self.nlu = Interpreter.load("models/nlu/default/current",
                                         RasaNLUConfig("config_spacy.json"))
         self.action_mgr = ActionManager(name='Actions',
-                                        replyFunction=self.reply,
                                         logLevel=actionLoglevel)
         self._queue = Queue.Queue(maxsize = 5)
         self.timers = assistantTimers(replyQueue=self._queue,
@@ -123,6 +122,8 @@ class JarvisInterface:
                 entities[entry['entity']].append(entry['value'])
             else:
                 entities[entry['entity']] = [ entry['value'] ]
+        if not entities.has_key('room'):
+            entities['room'] = [ self.room ]
         if entities:
             logger.info("Entities found: "+str(entities))
         job = {'origin': 'user',
@@ -130,12 +131,7 @@ class JarvisInterface:
                'msg': res['text'].encode('ascii'),
                'entities': entities}
         # Make sense of the request
-        if intent == 'controlDevice':
-            if not entities.has_key('room'):
-                entities['room'] = [ self.room ]
-            self.handle_device(entities,res['text'])
-        else:
-            self.handleJob(job)
+        self.handleJob(job)
 
 
     def reply(self, req):
@@ -192,7 +188,7 @@ class JarvisInterface:
 
     def timer(self, job):
         if job['origin'] == 'user':
-            self.timers.addTimer('timer',job['entities'])
+            self.timers.addTimer(job['intent'], job['entities'])
         else:
             msg = "Your {0} timer has expired, sir"
             msg = msg.format(''.join(job['entities']['task']).encode('ascii'))
@@ -227,7 +223,7 @@ class JarvisInterface:
         self.reply({'intent': job['intent'], 'msg': msg})
 
 
-    def handle_device(self,entities,request_text):
+    def controlDevice(self,entities,request_text):
         if not entities.has_key('command'):
             logger.error("Cannot determine command to send to devices.")
             return -1
