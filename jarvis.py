@@ -20,7 +20,7 @@ import requests,re
 import Queue
 
 
-from actions import ActionManager
+import actions
 from assistantTimers import assistantTimers
 from nonblockinginput import nonBlockingInput
 
@@ -43,12 +43,11 @@ class JarvisInterface:
         model_directory = trainer.persist('models/nlu/',
                                           fixed_model_name="current")
 
-
     def run(self,actionLoglevel='ERROR'):
         if self.nluinternal:
             self.nlu = Interpreter.load("models/nlu/default/current",
                                         RasaNLUConfig("config_spacy.json"))
-        self.action_mgr = ActionManager(name='Actions',
+        self.action_mgr = actions.ActionManager(name='Actions',
                                         logLevel=actionLoglevel)
         self._queue = Queue.Queue(maxsize = 5)
         self.timers = assistantTimers(replyQueue=self._queue,
@@ -223,59 +222,77 @@ class JarvisInterface:
         self.reply({'intent': job['intent'], 'msg': msg})
 
 
-    def controlDevice(self,entities,request_text):
-        if not entities.has_key('command'):
+    def controlDevice(self, job):
+        if not job['entities'].has_key('command'):
             logger.error("Cannot determine command to send to devices.")
             return -1
-        if not entities.has_key('device'):
+        if not job['entities'].has_key('device'):
             logger.error("Cannot identity device to command.")
             return -1
 
-        if entities.has_key('time'):
-            logger.critical("Control request for future action! "+str(entities['time']))
+        laterExecution = False
+        if job['entities'].has_key('time'):
+            laterExecution = True
+            logger.critical("Control request for future action! "+\
+                            str(job['entities']['time']))
 
-        if len(entities['command']) == 1 and len(entities['device']) == 1:
-            for r in entities['room']:
-                log = "MR:Attempting to send {0} to the {1} in the {2}"
-                log = log.format(entities['command'][0],
-                                 entities['device'][0],r)
-                logger.info(log)
-                self.action_mgr.controlDevice(entities['device'][0],
-                                              entities['command'][0],
-                                              r)
-        elif len(entities['room']) == 1 and len(entities['command']) == 1:
-            for d in entities['device']:
-                log = "MD:Attempting to send {0} to the {1} in the {2}"
-                log = log.format(entities['command'][0],
-                                 d,
-                                 entities['room'][0])
-                self.action_mgr.controlDevice(d,
-                                              entities['command'][0],
-                                              entities['room'][0])
-        elif len(entities['command']) > 1 and len(entities['device']) == 1:
-            logger.info("1-Received multiple commands, and rooms for one " \
-                        "device. Attempting to split request.")
-            for index,attempt in enumerate(request_text.split(' and ',1)):
-                if index > 0:
-                    self.get_intent(entities['device'][0]+" "+attempt)
-                else:
+        try:
+            if len(job['entities']['command']) == 1 \
+               and len(job['entities']['device']) == 1:
+                for r in job['entities']['room']:
+                    log = "MR:Attempting to send {0} to the {1} in the {2}"
+                    log = log.format(job['entities']['command'][0],
+                                     job['entities']['device'][0],r)
+                    logger.info(log)
+                    self.action_mgr.controlDevice(job['entities']['device'][0],
+                                                  job['entities']['command'][0],
+                                                  r,laterExecution)
+                    if laterExecution:
+                        print ("Saving job for the future.")
+                        self.timer(job)
+            elif len(job['entities']['room']) == 1 and \
+                 len(job['entities']['command']) == 1:
+                for d in job['entities']['device']:
+                    log = "MD:Attempting to send {0} to the {1} in the {2}"
+                    log = log.format(job['entities']['command'][0],
+                                     d,
+                                     job['entities']['room'][0])
+                    self.action_mgr.controlDevice(d,
+                                                  job['entities']['command'][0],
+                                                  job['entities']['room'][0],
+                                                  laterExecution)
+                    if laterExecution:
+                        print ("Saving job for the future.")
+                        self.timer(job)
+            elif len(job['entities']['command']) > 1 and len(job['entities']['device']) == 1:
+                logger.info("1-Received multiple commands, and rooms for one " \
+                            "device. Attempting to split request.")
+                for index,attempt in enumerate(job['msg'].split(' and ',1)):
+                    if index > 0:
+                        self.get_intent(job['entities']['device'][0]+" "+attempt)
+                    else:
+                        self.get_intent(attempt)
+            elif len(job['entities']['command']) > 1:
+                logger.info("2-Received multiple commands, rooms, and devices." \
+                            " Attempting to split request.")
+                for attempt in job['msg'].split(' and ',1):
                     self.get_intent(attempt)
-        elif len(entities['command']) > 1:
-            logger.info("2-Received multiple commands, rooms, and devices." \
-                        " Attempting to split request.")
-            for attempt in request_text.split(' and ',1):
-                self.get_intent(attempt)
-        elif len(entities['command']) == 1 and len(entities['device']) > 1:
-            logger.info("3-Received multiple rooms and devices with one " \
-                        "command. Attempting to split request.")
-            for index,attempt in enumerate(request_text.split(' and ',1)):
-                if index > 0:
-                    self.get_intent(entities['command'][0]+" "+attempt)
-                else:
-                    self.get_intent(attempt)
-        else:
-            logger.critical("4-Unhandled scenario: " \
-                            +str(entities)+" from "+request_text)
+            elif len(job['entities']['command']) == 1 and len(job['entities']['device']) > 1:
+                logger.info("3-Received multiple rooms and devices with one " \
+                            "command. Attempting to split request.")
+                for index,attempt in enumerate(job['msg'].split(' and ',1)):
+                    if index > 0:
+                        self.get_intent(job['entities']['command'][0]+" "+attempt)
+                    else:
+                        self.get_intent(attempt)
+            else:
+                logger.critical("4-Unhandled scenario: " \
+                                +str(job['entities'])+" from "+job['msg'])
+        except actions.InvalidDevice as e:
+            self.reply("I do not know how to control the " + e.device + \
+                       " in the " + e.room)
+        except:
+            logger.critical(traceback.print_exc())
 
 
     def handleJob(self, job):
