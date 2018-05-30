@@ -9,16 +9,10 @@ import argparse
 import coloredlogs,logging
 import warnings
 
-from rasa_nlu.converters import load_data
-from rasa_nlu.config import RasaNLUConfig
-from rasa_nlu.model import Trainer
-from rasa_nlu.model import Metadata, Interpreter
- 
 import code,time,sys,traceback
 from datetime import datetime
-import requests,re
+import json,requests,re
 import Queue
-
 
 import actions
 from assistantTimers import assistantTimers
@@ -29,24 +23,13 @@ coloredlogs.install(logger=logger,level="INFO")
 
 class JarvisInterface:
 
-    def __init__(self,room,name='Jarvis',nluinternal = True,loglevel='WARN'):
+    def __init__(self,room,name='Jarvis',loglevel='WARN'):
         self.room = room
         self.name = name
-        self.nluinternal = nluinternal
         self.conversation = []
         logger.setLevel(loglevel)
 
-    def train_nlu(self):
-        training_data = load_data('nlu.json')
-        trainer = Trainer(RasaNLUConfig("config_spacy.json"))
-        trainer.train(training_data)
-        model_directory = trainer.persist('models/nlu/',
-                                          fixed_model_name="current")
-
     def run(self,actionLoglevel='ERROR'):
-        if self.nluinternal:
-            self.nlu = Interpreter.load("models/nlu/default/current",
-                                        RasaNLUConfig("config_spacy.json"))
         self.action_mgr = actions.ActionManager(name='Actions',
                                         logLevel=actionLoglevel)
         self._queue = Queue.Queue(maxsize = 5)
@@ -101,17 +84,9 @@ class JarvisInterface:
         self.timers.join()
 
     def getIntent(self,req):
-        if nluinternal:
-            if isinstance(req, unicode):
-                res = self.nlu.parse(req)
-            else:
-                res = self.nlu.parse(unicode(req,"utf-8"))
-        else:
-            import requests, json
-            response = requests.post("http://localhost:5000/parse",
-                                     json={"q":req})
-            res = response.json()
-            logger.debug("NLU response is"+str(res))
+        response = requests.post("http://localhost:5000/parse", json={"q":req})
+        res = response.json()
+        logger.debug("NLU response is"+str(res))
         intent = res['intent']['name'].encode('ascii')
         logger.info("Intent is "+intent)
         self.conversation.append([ time.time(),'Me', res['text'], intent ])
@@ -312,9 +287,6 @@ class JarvisInterface:
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
                        description='Jarvis interface')
-    parser.add_argument('task',
-            choices=["train","run","both"],
-            help="Are we training Jarvis or running him?")
 
     parser.add_argument('--loglevel', dest='loglevel',
             choices=["DEBUG","INFO","WARN","ERROR","CRITICAL","NONE"],
@@ -326,33 +298,11 @@ if __name__ == '__main__':
             default="WARN",
             help="Set the logger level for the Action Manager")
 
-    parser.add_argument('--nluinternal', dest='nluinternal',
-            choices=["True","False"], default="False",
-            help="Use internal or external NLU")
-
     loglevel = parser.parse_args().loglevel
     actionloglevel = parser.parse_args().actionloglevel
 
-    task = parser.parse_args().task
-    if parser.parse_args().nluinternal == "False":
-        nluinternal = False
-    else:
-        nluinternal = True
     jarvis = JarvisInterface(room="office",
-                             nluinternal=nluinternal,
                              loglevel=loglevel)
 
-    if task == "train":
-        logger.info("Beginning training process...")
-        jarvis.train_nlu()
-    elif task == "run":
-        logger.info("Loading saved models for execution...")
-        jarvis.run(actionLoglevel=actionloglevel)
-    elif task == "both":
-        logger.info("Beginning training process...")
-        jarvis.train_nlu()
-        logger.info("Passing built models to execution stack...")
-        jarvis.run()
-    else:
-        print ("Please call with train or run to begin execution")
-        exit(1)
+    logger.info("Starting Jarvis...")
+    jarvis.run()
