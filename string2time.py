@@ -47,18 +47,6 @@ def convert(string):
             else:
                 pass
 
-    if len(tokens) == 4:
-        tokens[0] += tokens[1]
-        tokens[2] += tokens[3]
-        del tokens[3]
-        del tokens[1]
-    elif len(tokens) == 3:
-        if tokens[0] > tokens[1]:
-            tokens[0] += tokens[1]
-            del tokens[1]
-        elif tokens[1] > tokens[2]:
-            tokens[1] += tokens[2]
-            del tokens[2]
                 
     if string.find('minute') > -1 or string.find('hour') > -1 or string.find('second') > 1:
         value = 0
@@ -68,7 +56,27 @@ def convert(string):
     elif len(tokens) == 1:
         return "{:02d}:00".format(tokens[0])
     elif len(tokens) == 2:
+        if string.find('oh') > -1:
+            return "{:02d}:{:02d}".format(tokens[0],tokens[1])
+        elif tokens[0] == 20 and tokens[1] < 4:
+            return("{0}:00".format(tokens[0] + tokens[1]))
+        else:
+            return "{:02d}:{:02d}".format(tokens[0],tokens[1])
+    elif len(tokens) == 4:
+        tokens[0] += tokens[1]
+        tokens[2] += tokens[3]
+        del tokens[3]
+        del tokens[1]
         return "{:02d}:{:02d}".format(tokens[0],tokens[1])
+    elif len(tokens) == 3:
+        if tokens[1] < 10 and tokens[0] > tokens[1]:
+            tokens[0] += tokens[1]
+            del tokens[1]
+            return "{:02d}:{:02d}".format(tokens[0],tokens[1])
+        elif tokens[1] > tokens[2]:
+            tokens[1] += tokens[2]
+            del tokens[2]
+            return "{:02d}:{:02d}".format(tokens[0],tokens[1])
     else:
         raise InvalidTime(string)
 
